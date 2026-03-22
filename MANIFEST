@@ -52,6 +52,7 @@ lib/Net/ACME2/X/InvalidCharacters.pm
 lib/Net/ACME2/X/InvalidParameter.pm
 lib/Net/ACME2/X/UnexpectedResponse.pm
 lib/Net/ACME2/X/UnrecognizedKey.pm
+t/Net-ACME2-AccountKey.t
 t/Net-ACME2-Challenge-http_01-Handler.t
 t/Net-ACME2-Challenge-tls_alpn_01.t
 t/Net-ACME2-Challenge.t
