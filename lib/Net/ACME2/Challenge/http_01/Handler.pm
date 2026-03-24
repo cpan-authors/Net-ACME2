@@ -39,7 +39,7 @@ sub new {
 
     if ($ASSUME_UNIX_PATHS) {
         $file_path = $opts{'document_root'} . $opts{'challenge'}->path();
-        $dir = substr( $file_path, rindex( $file_path, '/' ) );
+        $dir = substr( $file_path, 0, rindex( $file_path, '/' ) );
     }
     else {
         require File::Spec;
