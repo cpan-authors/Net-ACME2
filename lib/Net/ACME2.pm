@@ -142,8 +142,6 @@ for and prefer the following XS-based libraries for cryptography instead:
 
 =over
 
-=item * L<Crypt::OpenSSL::RSA> (based on L<OpenSSL|http://openssl.org>)
-
 =item * L<CryptX> (based on L<LibTomCrypt|http://www.libtom.net/LibTomCrypt/>)
 
 =back
