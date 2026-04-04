@@ -25,6 +25,7 @@ use Net::ACME2::Challenge ();
 use Net::ACME2::Challenge::http_01 ();
 use Net::ACME2::Challenge::dns_01 ();
 use Net::ACME2::Challenge::tls_alpn_01 ();
+use Net::ACME2::Challenge::unknown ();
 
 use constant _ACCESSORS => (
     'id',
@@ -98,8 +99,10 @@ sub challenges {
         $module_leaf =~ tr<-><_>;
         $class .= "::$module_leaf";
 
-        #Ignore unrecognized challenges.
-        next if !$class->can('new');
+        #use unknown for unknown challenges - this ensures out of band challenges (for example: DNS-PERSIST-01) can be completed even if the module has no built-in support for the challenge itself.
+        if !$class->can('new') {
+         $class .= "::unknown";
+        }
 
         push @challenges, $class->new( %$c );
     }
