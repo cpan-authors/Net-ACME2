@@ -17,14 +17,19 @@ requires 'Promise::ES6';
 requires 'X::Tiny'                 => '0.12';
 requires 'IO::Socket::SSL';
 
-# Make sure thes optionals are present for testing.
+# Make sure these optionals are present for testing.
 requires 'Crypt::OpenSSL::RSA';
 requires 'CryptX';
-requires 'Net::Curl::Multi';
 
 # Undeclared dependency modules
 requires 'MIME::Base64';
-requires 'ExtUtils::PkgConfig';
+
+# Net::Curl::Multi requires libcurl development headers and ExtUtils::PkgConfig,
+# which are not available on Windows (Strawberry Perl).
+unless ($^O eq 'MSWin32') {
+    requires 'Net::Curl::Multi';
+    requires 'ExtUtils::PkgConfig';
+}
 
 on 'configure' => sub {
     requires 'ExtUtils::MakeMaker' => '6.64';
