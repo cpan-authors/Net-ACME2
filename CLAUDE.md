@@ -59,15 +59,16 @@ handle their absence gracefully with `eval { require ... }` and SKIP blocks.
 - `t/lib/Test::Crypt` provides JWT decode/verify without depending on Crypt::JWT
 - Use `Test::More`, `Test::Exception`, `Test::FailWarnings`, `Test::Deep`
 - ECDSA signatures are non-deterministic — verify both, don't compare bytes
-- New test files must be added to `MANIFEST`
+- New test files must be added to `MANIFEST` (regenerated via `make manifest`)
 
 ## Conventions
 
 - **Minimum Perl**: 5.10.0
 - **Commit messages**: Short, lowercase, descriptive (no conventional commits)
-- **MANIFEST**: Must be updated when adding files. It is manually maintained.
+- **MANIFEST**: Generated via `make manifest`. Don't hand-edit or re-sort it.
 - **Releases**: Done by the maintainer. Never bump versions or update Changes.
-- **README.md**: Not auto-generated. Don't update it for code changes.
+- **README.md**: Auto-generated via `pod2markdown lib/Net/ACME2.pm > README.md`.
+  Don't edit it directly — update the POD in `lib/Net/ACME2.pm` instead.
 - **Pure Perl**: Core library avoids XS. Optional XS backends for performance.
 - **Promises**: All public methods that do I/O return promises in async mode,
   direct values in sync mode. Use `Net::ACME2::PromiseUtil::then()` internally.
