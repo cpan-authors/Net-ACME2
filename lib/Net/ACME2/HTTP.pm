@@ -235,6 +235,7 @@ sub _xform_http_error {
                 %{ JSON::decode_json( $exc->get('content') ) },
             );
         };
+        my $json_parse_err = $@;
 
         if ($acme_error) {
             die Net::ACME2::X->create(
@@ -243,6 +244,16 @@ sub _xform_http_error {
                     http => $exc,
                     acme => $acme_error,
                 },
+            );
+        }
+
+        if ($json_parse_err) {
+            my $content = $exc->get('content');
+
+            die Net::ACME2::X->create(
+                'Generic',
+                "Failed to decode ACME error ($json_parse_err); HTTP status ${\$exc->get('status')}: $content",
+                { http => $exc },
             );
         }
     }
