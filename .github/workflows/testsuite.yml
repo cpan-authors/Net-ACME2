@@ -22,8 +22,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: perl -V
         run: perl -V
+      - name: Install libcurl headers
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
       - name: Install Dependencies
-        run: cpanm --notest --installdeps .
+        uses: perl-actions/install-with-cpm@v1.9
+        with:
+          cpanfile: "cpanfile"
       - name: perl Makefile.PL
         run: perl Makefile.PL
       - name: make test
@@ -65,14 +69,16 @@ jobs:
       - uses: actions/checkout@v6
       - name: perl -V
         run: perl -V
+      - name: Install libcurl headers
+        run: apt-get update && apt-get install -y libcurl4-openssl-dev pkg-config
       - name: Install Dependencies
-        run: cpanm --notest --installdeps .
-      - name: perl Makefile.PL
-        run: perl Makefile.PL
-      - name: make
-        run: make
-      - name: Run Tests
-        run: make test
+        uses: perl-actions/install-with-cpm@v1.9
+        with:
+          sudo: false
+          cpanfile: "cpanfile"
+      - run: perl Makefile.PL
+      - run: make
+      - run: make test
 
   macOS:
     needs: [ubuntu, linux]
@@ -90,14 +96,16 @@ jobs:
         run: brew install perl
       - name: perl -V
         run: perl -V
+      - name: Install libcurl headers
+        run: brew install curl
       - name: Install Dependencies
-        run: cpanm --notest --installdeps .
-      - name: perl Makefile.PL
-        run: perl Makefile.PL
-      - name: make
-        run: make
-      - name: Run Tests
-        run: make test
+        uses: perl-actions/install-with-cpm@v1.9
+        with:
+          sudo: false
+          cpanfile: "cpanfile"
+      - run: perl Makefile.PL
+      - run: make
+      - run: make test
 
   windows:
     needs: [ubuntu, linux]
@@ -117,7 +125,10 @@ jobs:
       - name: perl -V
         run: perl -V
       - name: Install Dependencies
-        run: cpanm --notest --installdeps .
+        uses: perl-actions/install-with-cpm@v1.9
+        with:
+          sudo: false
+          cpanfile: "cpanfile"
       - name: perl Makefile.PL
         run: perl Makefile.PL
       - name: make
