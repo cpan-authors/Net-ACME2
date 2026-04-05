@@ -160,11 +160,17 @@ sub new {
         'POST:/authz/1-0' => sub {
             my $h = $self->{'ca_class'}->HOST();
 
+            my %extra_headers;
+            if ($self->{'_retry_after_authz'}) {
+                $extra_headers{'retry-after'} = $self->{'_retry_after_authz'};
+            }
+
             return {
                 status => 'HTTP_OK',
                 headers => {
                     $self->_new_nonce_header(),
                     _CONTENT_TYPE_JSON(),
+                    %extra_headers,
                 },
                 content => $self->_authz_content($h),
             };
@@ -201,11 +207,17 @@ sub new {
                 $order->{'certificate'} = "https://$h/cert/1";
             }
 
+            my %extra_headers;
+            if ($self->{'_retry_after_order'}) {
+                $extra_headers{'retry-after'} = $self->{'_retry_after_order'};
+            }
+
             return {
                 status => 'HTTP_OK',
                 headers => {
                     $self->_new_nonce_header(),
                     _CONTENT_TYPE_JSON(),
+                    %extra_headers,
                 },
                 content => $order,
             };
@@ -290,6 +302,15 @@ sub DESTROY {
         no warnings 'redefine';
         *Net::ACME2::HTTP_Tiny::_base_request = $self->{'_base_request'};
     }
+
+    return;
+}
+
+sub set_retry_after {
+    my ($self, %opts) = @_;
+
+    $self->{'_retry_after_authz'} = $opts{'authz'};
+    $self->{'_retry_after_order'} = $opts{'order'};
 
     return;
 }

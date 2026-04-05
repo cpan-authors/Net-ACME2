@@ -524,6 +524,9 @@ Accepts a L<Net::ACME2::Authorization> instance and polls the
 ACME server for that authorization’s status. The $AUTHORIZATION
 object is then updated with the results of the poll.
 
+If the server includes a C<Retry-After> header, it is stored on the
+$AUTHORIZATION object and accessible via C<< $AUTHORIZATION->retry_after() >>.
+
 As a courtesy, this returns the $AUTHORIZATION’s new C<status()>.
 
 =cut
@@ -581,7 +584,8 @@ sub finalize_order {
 =head2 promise($status) = I<OBJ>->poll_order( $ORDER )
 
 Like C<poll_authorization()> but handles a
-L<Net::ACME2::Order> object instead.
+L<Net::ACME2::Order> object instead. The C<Retry-After> header,
+if present, is accessible via C<< $ORDER->retry_after() >>.
 
 =cut
 
@@ -758,6 +762,8 @@ sub _poll_order_or_authz {
 
             $order_or_authz_obj->update($content);
 
+            $order_or_authz_obj->{'_retry_after'} = $get->header('retry-after');
+
             return $order_or_authz_obj->status();
         },
     );
@@ -846,8 +852,6 @@ sub _die_generic {
 
 =item * Add pre-authorization support if there is ever a production
 use for it.
-
-=item * Expose the Retry-After header via the module API.
 
 =item * There is currently no way to fetch an order or challenge’s
 properties via URL. Prior to ACME’s adoption of “POST-as-GET” this was
