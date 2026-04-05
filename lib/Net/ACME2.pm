@@ -584,6 +584,100 @@ sub get_certificate_chain {
 
 #----------------------------------------------------------------------
 
+=head2 promise(\%chains) = I<OBJ>->get_certificate_chains( $ORDER )
+
+Like C<get_certificate_chain()> but also fetches any alternate
+certificate chains that the server offers via C<Link> headers with
+C<rel="alternate"> (per RFC 8555, section 7.4.2).
+
+Returns a hash reference:
+
+    {
+        default    => $pem_chain,
+        alternates => [ $alt_pem1, $alt_pem2, ... ],
+    }
+
+If the server offers no alternate chains, C<alternates> will be
+an empty array reference.
+
+=cut
+
+sub get_certificate_chains {
+    my ($self, $order) = @_;
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get( $order->certificate() ),
+        sub {
+            my ($resp) = @_;
+
+            my $default = $resp->content();
+
+            my @alt_urls = _parse_link_alternates($resp);
+
+            if (!@alt_urls) {
+                return {
+                    default    => $default,
+                    alternates => [],
+                };
+            }
+
+            return $self->_fetch_alternates($default, \@alt_urls);
+        },
+    );
+}
+
+sub _parse_link_alternates {
+    my ($resp) = @_;
+
+    my $link_header = $resp->header('link');
+
+    return if !defined $link_header;
+
+    my @links = ref $link_header ? @$link_header : ($link_header);
+
+    my @alt_urls;
+    for my $link (@links) {
+        if ($link =~ m{<([^>]+)>\s*;\s*rel="alternate"}) {
+            push @alt_urls, $1;
+        }
+    }
+
+    return @alt_urls;
+}
+
+sub _fetch_alternates {
+    my ($self, $default, $alt_urls) = @_;
+
+    my $result = {
+        default    => $default,
+        alternates => [],
+    };
+
+    my $remaining = [ @$alt_urls ];
+
+    return $self->_fetch_next_alternate($result, $remaining);
+}
+
+sub _fetch_next_alternate {
+    my ($self, $result, $remaining) = @_;
+
+    if (!@$remaining) {
+        return $result;
+    }
+
+    my $url = shift @$remaining;
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get($url),
+        sub {
+            push @{ $result->{'alternates'} }, shift()->content();
+            return $self->_fetch_next_alternate($result, $remaining);
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
 sub _key_thumbprint {
     my ($self) = @_;
 
