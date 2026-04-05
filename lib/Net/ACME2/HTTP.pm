@@ -354,10 +354,6 @@ sub _create_jwt {
                 die "No nonce even after _get_first_nonce()!";
             };
 
-            # For testing badNonce retry …
-            # $nonce = reverse($nonce) if $self->{'_retries_left'};
-            # $nonce = reverse($nonce);
-
             return $self->{'_jwt_maker'}->$jwt_method(
                 key_id => $self->{'_key_id'},
                 payload => $data,
