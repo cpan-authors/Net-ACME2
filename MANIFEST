@@ -2,7 +2,6 @@ AI_POLICY.md
 Changes
 examples/dns-01.pl
 examples/dns-01_async.pl
-examples/eval_bug.readme
 examples/http-01.pl
 examples/http-01_async.pl
 examples/lib/Net_ACME2_Example.pm
@@ -64,10 +63,10 @@ t/Net-ACME2-Error.t
 t/Net-ACME2-get_orders.t
 t/Net-ACME2-HTTP.t
 t/Net-ACME2-JWTMaker.t
+t/Net-ACME2-key-change.t
 t/Net-ACME2-order-lifecycle.t
 t/Net-ACME2-PromiseUtil.t
 t/Net-ACME2-RetryAfter.t
-t/Net-ACME2-key-change.t
 t/Net-ACME2-revoke.t
 t/Net-ACME2.t
 t/Net-ACME2_pre_rename.t
