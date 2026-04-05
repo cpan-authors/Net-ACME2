@@ -1,8 +1,6 @@
 
 use ExtUtils::MakeMaker;
 
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
 WriteMakefile(
     NAME         => 'Net::ACME2',
     AUTHOR       => 'Felipe Gasper',
@@ -10,6 +8,14 @@ WriteMakefile(
     VERSION_FROM => 'lib/Net/ACME2.pm',
     LICENSE      => 'perl',
     MIN_PERL_VERSION => '5.10.0',
+
+    CONFIGURE_REQUIRES => {
+        'ExtUtils::MakeMaker' => '6.64',
+    },
+    BUILD_REQUIRES => {
+        'ExtUtils::MakeMaker' => '6.64',
+    },
+
     PREREQ_PM    => {
         'autodie'                  => 0,
         'constant'                 => 1.23,
@@ -30,9 +36,21 @@ WriteMakefile(
         # Net::SSLeay, which requires XS. :-(
         'IO::Socket::SSL'          => 0,
     },
+
+    TEST_REQUIRES => {
+        'File::Slurp'     => 0,
+        'Test::More'      => 1.0,
+        'Test::Deep'      => 0,
+        'Test::Exception' => 0.40,
+        'Test::NoWarnings' => 0,
+        'Test::FailWarnings' => 0,
+        'HTTP::Status' => 0,
+    },
+
     META_MERGE => {
         'meta-spec' => { version => 2 },
-        resources   => {
+
+        resources => {
             repository => {
                 type => 'git',
                 url  => 'https://github.com/FGasper/p5-Net-ACME2.git',
@@ -42,14 +60,29 @@ WriteMakefile(
                 web => 'https://github.com/FGasper/p5-Net-ACME2/issues',
             },
         },
-    },
-    TEST_REQUIRES => {
-        'File::Slurp'     => 0,
-        'Test::More'      => 1.0,
-        'Test::Deep'      => 0,
-        'Test::Exception' => 0.40,
-        'Test::NoWarnings' => 0,
-        'Test::FailWarnings' => 0,
-        'HTTP::Status' => 0,
+
+        prereqs => {
+            runtime => {
+                recommends => {
+                    'Crypt::OpenSSL::RSA' => 0,
+                    'CryptX'              => 0,
+                    'Net::Curl::Multi'    => 0,
+                },
+                suggests => {
+                    'Crypt::OpenSSL::RSA' => '0.35',
+                },
+            },
+        },
+
+        provides => {
+            'Net::ACME2' => {
+                file    => 'lib/Net/ACME2.pm',
+                version => '0.40_02',
+            },
+        },
+
+        no_index => {
+            directory => [ 't', 'examples' ],
+        },
     },
 );
