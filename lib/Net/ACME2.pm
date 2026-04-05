@@ -1043,7 +1043,7 @@ sub _key_thumbprint {
 sub _get_directory {
     my ($self) = @_;
 
-    return $self->{'_directory_promise'} ||= do {
+    return $self->{'_directory_cache'} ||= do {
         my $dir_path = $self->DIRECTORY_PATH();
 
         my $http = $self->{'_http'};

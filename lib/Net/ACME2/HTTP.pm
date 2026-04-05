@@ -163,6 +163,10 @@ sub _post {
 
                     my $resp;
 
+                    # NB: We mutate $self->{'_retries_left'} rather than
+                    # using local() because this code may run inside a
+                    # promise chain where local's dynamic scope doesn't
+                    # extend across async callbacks.
                     if ( eval { $err->get('acme')->type() =~ m<:badNonce\z> } ) {
                         if (!$self->{'_retries_left'}) {
                             warn( "$url: Received “badNonce” error, and no retries left!\n" );
