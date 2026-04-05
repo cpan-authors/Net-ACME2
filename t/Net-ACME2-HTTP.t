@@ -540,7 +540,7 @@ my $acme_key = Net::ACME2::AccountKey->new($_KEY_PEM);
 }
 
 #----------------------------------------------------------------------
-# Test: POST without key dies
+# Test: POST without key dies with structured exception
 #----------------------------------------------------------------------
 
 {
@@ -552,11 +552,48 @@ my $acme_key = Net::ACME2::AccountKey->new($_KEY_PEM);
 
     $http->set_new_nonce_url('https://example.com/new-nonce');
 
-    throws_ok(
-        sub { $http->post_key_id('https://example.com/endpoint', '') },
-        qr/key/,
-        'POST without key dies with helpful message',
+    my $err;
+    eval {
+        $http->post_key_id('https://example.com/endpoint', '');
+        1;
+    } or $err = $@;
+
+    ok($err, 'POST without key throws exception');
+    like("$err", qr/key/, 'POST without key message mentions "key"');
+    ok(
+        eval { $err->isa('Net::ACME2::X::Generic') },
+        'POST without key throws Net::ACME2::X::Generic',
+    ) or diag("Got: " . ref($err) || $err);
+}
+
+#----------------------------------------------------------------------
+# Test: _post with empty JWT method dies with structured exception
+#----------------------------------------------------------------------
+
+{
+    my $mock = MockUA->new(responses => []);
+
+    my $http = Net::ACME2::HTTP->new(
+        key    => $acme_key,
+        key_id => 'https://example.com/acct/1',
+        ua     => $mock,
     );
+
+    $http->set_new_nonce_url('https://example.com/new-nonce');
+
+    # Call _post directly with an empty jwt_method to trigger the guard
+    my $err;
+    eval {
+        $http->_post('', 'https://example.com/endpoint', '');
+        1;
+    } or $err = $@;
+
+    ok($err, '_post without JWT method throws exception');
+    like("$err", qr/JWT method/, '_post without JWT method message is descriptive');
+    ok(
+        eval { $err->isa('Net::ACME2::X::Generic') },
+        '_post without JWT method throws Net::ACME2::X::Generic',
+    ) or diag("Got: " . ref($err) || $err);
 }
 
 #----------------------------------------------------------------------
