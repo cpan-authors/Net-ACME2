@@ -413,6 +413,41 @@ sub get_orders {
 
 #----------------------------------------------------------------------
 
+=head2 promise(\%account) = I<OBJ>->update_account( %OPTS )
+
+Updates the account associated with the ACME2 object's key.
+%OPTS are as described in RFC 8555 section 7.3.2; in practice
+only C<contact> is meaningfully updatable. Example:
+
+    my $acct = $acme->update_account(
+        contact => ['mailto:new@example.com'],
+    );
+
+Returns a hashref of the updated account object.
+
+=cut
+
+sub update_account {
+    my ($self, %opts) = @_;
+
+    my $url = $self->{'_key_id'} or do {
+        _die_generic('No key ID has been set. Either pass "key_id" to new(), or create_account().');
+    };
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_url( $url, \%opts ),
+        sub {
+            my ($resp) = @_;
+
+            $resp->die_because_unexpected() if $resp->status() != _HTTP_OK;
+
+            return $resp->content_struct();
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
 =head2 promise($order) = I<OBJ>->create_order( %OPTS )
 
 Returns a L<Net::ACME2::Order> object. %OPTS is as described in the
