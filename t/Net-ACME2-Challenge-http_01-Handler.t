@@ -63,7 +63,7 @@ ok(
     );
 }
 
-#This ensures that there’s no warning or error otherwise
+#This ensures that there's no warning or error otherwise
 #if the file goes away prematurely.
 {
     my $handler = $challenge->create_handler( 'my_key_authz', $docroot );
