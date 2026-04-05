@@ -24,6 +24,7 @@ requires 'Net::Curl::Multi';
 
 # Undeclared dependency modules
 requires 'MIME::Base64';
+requires 'ExtUtils::PkgConfig';
 
 on 'configure' => sub {
     requires 'ExtUtils::MakeMaker' => '6.64';
