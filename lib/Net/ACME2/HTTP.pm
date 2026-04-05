@@ -194,8 +194,7 @@ sub _post {
 
                     $self->{'_retries_left'} = $_MAX_RETRIES;
 
-                    local $@ = $err;
-                    die;
+                    die $err;
                 },
             );
         },
@@ -248,8 +247,7 @@ sub _xform_http_error {
         }
     }
 
-    $@ = $exc;
-    die;
+    die $exc;
 }
 
 # promise
