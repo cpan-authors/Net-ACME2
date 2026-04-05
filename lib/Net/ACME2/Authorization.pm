@@ -18,6 +18,7 @@ The ACME Authorization object.
 use parent qw( Net::ACME2::AccessorBase );
 
 use Call::Context ();
+use Net::ACME2::RetryAfter ();
 
 use Net::ACME2::Challenge ();
 
@@ -53,6 +54,23 @@ or C<undef> if the server did not send one. Only populated
 after C<poll_authorization()>.
 
 =back
+
+=head2 I<OBJ>->retry_after_seconds()
+
+Parses the C<Retry-After> header value (from the most recent poll)
+into an integer number of seconds. Handles both delay-seconds and
+HTTP-date formats per RFC 7231.
+
+Returns C<undef> if no C<Retry-After> was present, or C<0> if the
+HTTP-date is in the past.
+
+=cut
+
+sub retry_after_seconds {
+    my ($self) = @_;
+
+    return Net::ACME2::RetryAfter::parse( $self->retry_after() );
+}
 
 =head1 OTHER METHODS
 

@@ -311,14 +311,20 @@ subtest 'retry_after exposed from poll responses' => sub {
     $acme->poll_order($order);
     is( $order->retry_after(), 30, 'Order retry_after set from header' );
 
+    # retry_after_seconds() should parse delay-seconds
+    is( $authz->retry_after_seconds(), 10, 'Authorization retry_after_seconds parses integer' );
+    is( $order->retry_after_seconds(), 30, 'Order retry_after_seconds parses integer' );
+
     # Clear Retry-After and poll again — should become undef
     $SERVER_OBJ->set_retry_after( authz => undef, order => undef );
 
     $acme->poll_authorization($authz);
     is( $authz->retry_after(), undef, 'Authorization retry_after cleared when header absent' );
+    is( $authz->retry_after_seconds(), undef, 'Authorization retry_after_seconds undef when header absent' );
 
     $acme->poll_order($order);
     is( $order->retry_after(), undef, 'Order retry_after cleared when header absent' );
+    is( $order->retry_after_seconds(), undef, 'Order retry_after_seconds undef when header absent' );
 };
 
 done_testing();
