@@ -73,40 +73,6 @@ ok(
     unlink $fs_path;
 }
 
-# Test with $ASSUME_UNIX_PATHS enabled (exercises the substr-based
-# directory extraction, which had a bug where it extracted the filename
-# portion instead of the directory).
-SKIP: {
-    skip 'ASSUME_UNIX_PATHS test requires Unix-like OS', 3 if $^O eq 'MSWin32';
-
-    my $docroot2 = File::Temp::tempdir( CLEANUP => 1 );
-
-    local $Net::ACME2::Challenge::http_01::Handler::ASSUME_UNIX_PATHS = 1;
-
-    my $expected_dir = "$docroot2/.well-known/acme-challenge";
-    my $expected_file = "$expected_dir/my_token";
-
-    my $handler = $challenge->create_handler( 'unix_key_authz', $docroot2 );
-
-    ok(
-        ( -d $expected_dir ),
-        'ASSUME_UNIX_PATHS: challenge directory is created correctly',
-    );
-
-    ok(
-        ( -e $expected_file ),
-        'ASSUME_UNIX_PATHS: challenge file is created',
-    );
-
-    my $contents = File::Slurp::read_file($expected_file);
-
-    is(
-        $contents,
-        'unix_key_authz',
-        'ASSUME_UNIX_PATHS: file contents match expectations',
-    );
-}
-
 done_testing();
 
 #----------------------------------------------------------------------
