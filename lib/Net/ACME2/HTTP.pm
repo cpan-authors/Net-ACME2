@@ -133,11 +133,11 @@ sub update_key {
 sub _post {
     my ( $self, $jwt_method, $url, $data, $opts_hr ) = @_;
 
-    die "Need JWT method!" if !$jwt_method;
+    die Net::ACME2::X->create('Generic', "Need JWT method!") if !$jwt_method;
 
     # Needed now that the constructor allows instantiation
     # without “key”.
-    die "Constructor needed “key” to do POST! ($url)" if !$self->{'_acme_key'};
+    die Net::ACME2::X->create('Generic', "Constructor needed \"key\" to do POST! ($url)") if !$self->{'_acme_key'};
 
     return Net::ACME2::PromiseUtil::then(
         $self->_create_jwt( $jwt_method, $url, $data ),
