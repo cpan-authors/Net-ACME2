@@ -211,11 +211,12 @@ sub _xlate_http_tiny_request_to_net_curl_easy {
         # e.g., HEAD
         $easy->setopt( Net::Curl::Easy::CURLOPT_NOBODY(), 1 );
     }
-    elsif ($method ne 'GET') {
-        $easy->setopt( Net::Curl::Easy::CURLOPT_CUSTOMREQUEST(), $method );
+    elsif ($method eq 'GET') {
+
+        # GET is curl's default; no options needed.
     }
     else {
-        die "Unknown HTTP method: $method";
+        $easy->setopt( Net::Curl::Easy::CURLOPT_CUSTOMREQUEST(), $method );
     }
 
     return $easy;
