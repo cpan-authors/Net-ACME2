@@ -597,6 +597,34 @@ sub change_key {
 
 #----------------------------------------------------------------------
 
+=head2 promise() = I<OBJ>->deactivate_account()
+
+Deactivates the account on the ACME server, as described in
+RFC 8555 section 7.3.6. This is permanent: the server will reject
+all future requests authorized by this account's key.
+
+Requires that a key ID has been set (via C<create_account()> or
+the C<key_id> parameter to C<new()>).
+
+=cut
+
+sub deactivate_account {
+    my ($self) = @_;
+
+    $self->_require_key_id({});
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_url(
+            $self->{'_key_id'},
+            { status => 'deactivated' },
+        ),
+        sub {
+            return;
+        },
+    );
+}
+
+#----------------------------------------------------------------------
 =head2 promise($order) = I<OBJ>->create_order( %OPTS )
 
 Returns a L<Net::ACME2::Order> object. %OPTS is as described in the
