@@ -27,7 +27,7 @@ jobs:
       - name: perl -V
         run: perl -V
       - name: Install Dependencies
-        run: curl -L https://cpanmin.us | perl - --notest --installdeps .
+        run: cpanm --notest --installdeps .
       - name: perl Makefile.PL
         run: perl Makefile.PL
       - name: make
