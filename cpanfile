@@ -17,9 +17,10 @@ requires 'Promise::ES6';
 requires 'X::Tiny'                 => '0.12';
 requires 'IO::Socket::SSL';
 
-recommends 'Crypt::OpenSSL::RSA';
-recommends 'CryptX';
-recommends 'Net::Curl::Multi';
+# Make sure thes optionals are present for testing.
+requires 'Crypt::OpenSSL::RSA';
+requires 'CryptX';
+requires 'Net::Curl::Multi';
 
 on 'configure' => sub {
     requires 'ExtUtils::MakeMaker' => '6.64';
