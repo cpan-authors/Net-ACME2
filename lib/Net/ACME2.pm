@@ -536,6 +536,41 @@ As a courtesy, this returns the $AUTHORIZATION’s new C<status()>.
 
 #----------------------------------------------------------------------
 
+=head2 promise($status) = I<OBJ>->deactivate_authorization( $AUTHORIZATION )
+
+Deactivates an authorization, as described in RFC 8555 section 7.5.2.
+
+Accepts a L<Net::ACME2::Authorization> instance and asks the ACME server
+to deactivate it. The $AUTHORIZATION object is then updated with the
+results of the deactivation.
+
+As a courtesy, this returns the $AUTHORIZATION's new C<status()>,
+which should be C<deactivated>.
+
+=cut
+
+sub deactivate_authorization {
+    my ($self, $authz_obj) = @_;
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_url(
+            $authz_obj->id(),
+            {
+                status => 'deactivated',
+            },
+        ),
+        sub {
+            my $resp = shift;
+
+            $authz_obj->update( $resp->content_struct() );
+
+            return $authz_obj->status();
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
 =head2 promise($status) = I<OBJ>->finalize_order( $ORDER, $CSR )
 
 Finalizes an order and updates the $ORDER object with the returned

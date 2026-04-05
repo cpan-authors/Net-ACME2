@@ -158,13 +158,28 @@ sub new {
         },
 
         'POST:/authz/1-0' => sub {
+            my $args_hr = shift;
             my $h = $self->{'ca_class'}->HOST();
+
+            # Check if this is a deactivation request
+            my $content_hr = JSON::decode_json($args_hr->{'content'});
+            my $payload_b64 = $content_hr->{'payload'};
+
+            # Non-empty payload means it's a status update, not POST-as-GET
+            if ($payload_b64 && $payload_b64 ne '') {
+                my $payload = JSON::decode_json(
+                    MIME::Base64::decode_base64url($payload_b64)
+                );
+
+                if ($payload->{'status'} && $payload->{'status'} eq 'deactivated') {
+                    $self->{'_authz_deactivated'} = 1;
+                }
+            }
 
             my %extra_headers;
             if ($self->{'_retry_after_authz'}) {
                 $extra_headers{'retry-after'} = $self->{'_retry_after_authz'};
             }
-
             return {
                 status => 'HTTP_OK',
                 headers => {
@@ -318,7 +333,9 @@ sub set_retry_after {
 sub _authz_content {
     my ($self, $host) = @_;
 
-    my $status = $self->{'_challenge_accepted'} ? 'valid' : 'pending';
+    my $status = $self->{'_authz_deactivated'} ? 'deactivated'
+               : $self->{'_challenge_accepted'} ? 'valid'
+               : 'pending';
 
     return {
         status => $status,
