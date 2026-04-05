@@ -44,6 +44,7 @@ sub new {
                     newAccount => "https://$host/my-new-account",
                     newOrder => "https://$host/my-new-order",
                     keyChange => "https://$host/my-key-change",
+                    revokeCert => "https://$host/my-revoke-cert",
                 },
             };
         },
@@ -398,6 +399,30 @@ sub new {
                     'content-type' => 'application/pem-certificate-chain',
                 },
                 content => "-----BEGIN CERTIFICATE-----\nALTERNATE-CHAIN-2...\n-----END CERTIFICATE-----\n",
+            };
+        },
+
+        'POST:/my-revoke-cert' => sub {
+            my $args_hr = shift;
+
+            my ($key_obj, $header, $payload) = Test::Crypt::decode_acme2_jwt_extract_key($args_hr->{'content'});
+
+            die "No 'certificate' in revoke payload!" if !$payload->{'certificate'};
+
+            # Track whether the signing key differs from any registered account key
+            my $is_ecc = $key_obj->isa('Crypt::Perl::ECDSA::PublicKey');
+            my $pem_method = $is_ecc ? 'to_pem_with_curve_name' : 'to_pem';
+            my $key_pem = $key_obj->$pem_method();
+
+            $self->{'_last_revoke_used_cert_key'} = !$self->{'_registered_keys'}{$key_pem};
+            $self->{'_last_revoke_reason'} = $payload->{'reason'};
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                },
+                content => '',
             };
         },
     };
