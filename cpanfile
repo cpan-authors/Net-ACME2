@@ -18,7 +18,6 @@ requires 'X::Tiny'                 => '0.12';
 requires 'IO::Socket::SSL';
 
 # Make sure these optionals are present for testing.
-requires 'Crypt::OpenSSL::RSA';
 requires 'CryptX';
 
 # Undeclared dependency modules

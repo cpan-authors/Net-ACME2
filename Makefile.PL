@@ -64,12 +64,8 @@ WriteMakefile(
         prereqs => {
             runtime => {
                 recommends => {
-                    'Crypt::OpenSSL::RSA' => 0,
                     'CryptX'              => 0,
                     'Net::Curl::Multi'    => 0,
-                },
-                suggests => {
-                    'Crypt::OpenSSL::RSA' => '0.35',
                 },
             },
         },

@@ -26,7 +26,7 @@ CI runs on `perldocker/perl-tester` containers across Perl 5.10–5.32.
 
 ```
 Net::ACME2              — Main client (subclass to set HOST/DIRECTORY_PATH)
-  ├── AccountKey        — Key abstraction (3 backends: Crypt::Perl, Crypt::OpenSSL::RSA, CryptX)
+  ├── AccountKey        — Key abstraction (2 backends: CryptX, Crypt::Perl)
   ├── HTTP              — JOSE+JSON transport, nonce mgmt, badNonce retry
   │   ├── HTTP_Tiny     — Sync backend (default)
   │   ├── Curl          — Async backend (EXPERIMENTAL)
@@ -45,11 +45,11 @@ Net::ACME2              — Main client (subclass to set HOST/DIRECTORY_PATH)
 ## Crypto Backends
 
 AccountKey.pm selects backends in priority order:
-- **RSA**: Crypt::OpenSSL::RSA → Crypt::PK::RSA → Crypt::Perl (pure Perl fallback)
+- **RSA**: Crypt::PK::RSA → Crypt::Perl (pure Perl fallback)
 - **ECDSA**: Crypt::PK::ECC → Crypt::Perl
 
-Crypt::OpenSSL::RSA and CryptX are optional — not in PREREQ_PM. Tests must
-handle their absence gracefully with `eval { require ... }` and SKIP blocks.
+CryptX is optional — not in PREREQ_PM. Tests must handle its absence
+gracefully with `eval { require ... }` and SKIP blocks.
 
 ## Test Patterns
 
@@ -77,9 +77,6 @@ handle their absence gracefully with `eval { require ... }` and SKIP blocks.
 
 ## Gotchas
 
-- `Crypt::OpenSSL::RSA` 0.35+ changed `use_pkcs1_padding()` behavior — signing
-  via `RSA_sign()` always uses PKCS#1 v1.5 internally, but the padding method
-  affects `private_encrypt()`. Tests should handle this with eval + skip.
 - The `Edit` tool can introduce Unicode smart quotes into `.pm`/`.pl` files.
   Always verify edited Perl files compile: `perl -c <file>`.
 - Handler.pm's `$ASSUME_UNIX_PATHS` switches between File::Spec and simple
