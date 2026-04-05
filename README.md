@@ -121,7 +121,6 @@ cryptography libraries receive.
 To address these problems, Net::ACME2 will, after parsing a key, look
 for and prefer the following XS-based libraries for cryptography instead:
 
-- [Crypt::OpenSSL::RSA](https://metacpan.org/pod/Crypt%3A%3AOpenSSL%3A%3ARSA) (based on [OpenSSL](http://openssl.org))
 - [CryptX](https://metacpan.org/pod/CryptX) (based on [LibTomCrypt](http://www.libtom.net/LibTomCrypt/))
 
 If the above are unavailable to you, then you may be able to speed up

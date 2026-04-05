@@ -56,7 +56,7 @@ sub _make_key_and_csr_for_domains {
     Call::Context::must_be_list();
 
     #ECDSA is used here because it’s quick enough to run in pure Perl.
-    #If you need/want RSA, look at Crypt::OpenSSL::RSA, and/or
+    #If you need/want RSA, look at Crypt::PK::RSA, and/or
     #install Math::BigInt::GMP (or M::BI::Pari) and use
     #Crypt::Perl::RSA::Generate. Or just do qx<openssl genrsa>. :)
     my $key = Crypt::Perl::ECDSA::Generate::by_name($class->_ECDSA_CURVE());
