@@ -246,4 +246,46 @@ subtest 'Order identifiers() returns copies' => sub {
     is( $idents2[0]{'value'}, 'example.com', 'identifiers() returns defensive copies' );
 };
 
+subtest 'retry_after exposed from poll responses' => sub {
+    my $SERVER_OBJ = Test::ACME2_Server->new(
+        ca_class => 'MyCA',
+    );
+
+    my $acme = MyCA->new( key => $_P256_KEY );
+    $acme->create_account( termsOfServiceAgreed => 1 );
+
+    my $order = $acme->create_order(
+        identifiers => [
+            { type => 'dns', value => 'example.com' },
+        ],
+    );
+
+    my @authz_urls = $order->authorizations();
+    my $authz = $acme->get_authorization( $authz_urls[0] );
+
+    # Before polling, retry_after should be undef
+    is( $order->retry_after(), undef, 'Order retry_after undef before poll' );
+    is( $authz->retry_after(), undef, 'Authorization retry_after undef before poll' );
+
+    # Set Retry-After on the mock server
+    $SERVER_OBJ->set_retry_after( authz => 10, order => 30 );
+
+    # Poll authorization — should pick up Retry-After
+    $acme->poll_authorization($authz);
+    is( $authz->retry_after(), 10, 'Authorization retry_after set from header' );
+
+    # Poll order — should pick up Retry-After
+    $acme->poll_order($order);
+    is( $order->retry_after(), 30, 'Order retry_after set from header' );
+
+    # Clear Retry-After and poll again — should become undef
+    $SERVER_OBJ->set_retry_after( authz => undef, order => undef );
+
+    $acme->poll_authorization($authz);
+    is( $authz->retry_after(), undef, 'Authorization retry_after cleared when header absent' );
+
+    $acme->poll_order($order);
+    is( $order->retry_after(), undef, 'Order retry_after cleared when header absent' );
+};
+
 done_testing();
