@@ -166,6 +166,10 @@ sub new {
                 status => 'valid',
             );
 
+            if (($payload->{'status'} || '') eq 'deactivated') {
+                $response{'status'} = 'deactivated';
+            }
+
             if ($payload->{'contact'}) {
                 $response{'contact'} = $payload->{'contact'};
             }
@@ -567,7 +571,7 @@ sub _handle_request {
     $todo_cr or do {
         my @routes = sort keys %{ $self->{'routing'} };
         die "No routing for '$dispatch_key'! (@routes)";
-    };
+    }
 
     my $resp_hr = $todo_cr->($args_hr);
 
