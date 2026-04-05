@@ -852,8 +852,12 @@ protocol specification for details about this format.
 sub get_certificate_chain {
     my ($self, $order) = @_;
 
+    my $url = $order->certificate() or _die_generic(
+        'Order has no certificate URL (status: ' . $order->status() . '). Poll the order until it reaches "valid" status before fetching the certificate.',
+    );
+
     return Net::ACME2::PromiseUtil::then(
-        $self->_post_as_get( $order->certificate() ),
+        $self->_post_as_get( $url ),
         sub {
             return shift()->content();
         },
@@ -883,8 +887,12 @@ an empty array reference.
 sub get_certificate_chains {
     my ($self, $order) = @_;
 
+    my $url = $order->certificate() or _die_generic(
+        'Order has no certificate URL (status: ' . $order->status() . '). Poll the order until it reaches "valid" status before fetching the certificate.',
+    );
+
     return Net::ACME2::PromiseUtil::then(
-        $self->_post_as_get( $order->certificate() ),
+        $self->_post_as_get( $url ),
         sub {
             my ($resp) = @_;
 
