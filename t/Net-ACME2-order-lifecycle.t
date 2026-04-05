@@ -231,6 +231,29 @@ subtest 'finalize_order with DER CSR' => sub {
     );
 };
 
+subtest 'deactivate_authorization' => sub {
+    my $SERVER_OBJ = Test::ACME2_Server->new(
+        ca_class => 'MyCA',
+    );
+
+    my $acme = MyCA->new( key => $_P256_KEY );
+    $acme->create_account( termsOfServiceAgreed => 1 );
+
+    my $order = $acme->create_order(
+        identifiers => [
+            { type => 'dns', value => 'example.com' },
+        ],
+    );
+
+    my @authz_urls = $order->authorizations();
+    my $authz = $acme->get_authorization( $authz_urls[0] );
+    is( $authz->status(), 'pending', 'authorization starts as pending' );
+
+    my $status = $acme->deactivate_authorization($authz);
+    is( $status, 'deactivated', 'deactivate_authorization() returns deactivated' );
+    is( $authz->status(), 'deactivated', 'authorization object updated to deactivated' );
+};
+
 subtest 'Order identifiers() returns copies' => sub {
     my $SERVER_OBJ = Test::ACME2_Server->new(
         ca_class => 'MyCA',
