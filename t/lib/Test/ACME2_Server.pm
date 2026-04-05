@@ -1,6 +1,12 @@
 package Test::ACME2_Server;
 
+use strict;
+use warnings;
+
 use Test::Crypt;
+
+use JSON ();
+use MIME::Base64 ();
 
 use Net::ACME2::HTTP_Tiny;
 
@@ -15,9 +21,9 @@ sub new {
 
     my $self = bless \%opts, $class;
 
-    $self->{'ca_class'} or die "need “ca_class”!";
+    $self->{'ca_class'} or die "need 'ca_class'!";
 
-    # For now, this is kept here. It’s feasible that future testing
+    # For now, this is kept here. It's feasible that future testing
     # needs may prompt a desire to make it customizable.
     $self->{'routing'} = {
         ('GET:' . $self->{'ca_class'}->DIRECTORY_PATH()) => sub {
@@ -35,6 +41,7 @@ sub new {
 
                     newNonce => "https://$host/my-new-nonce",
                     newAccount => "https://$host/my-new-account",
+                    newOrder => "https://$host/my-new-order",
                 },
             };
         },
@@ -73,7 +80,7 @@ sub new {
                 next if !exists $payload->{$name};
 
                 if (ref($payload->{$name}) ne ref( JSON::true )) {
-                    die "$name should be boolean, not “$name”";
+                    die "$name should be boolean, not '$name'";
                 }
 
                 $response{$name} = $payload->{$name};
@@ -89,6 +96,125 @@ sub new {
                     location => "https://$host/key/" . Digest::MD5::md5_hex($key_pem),
                 },
                 content => \%response,
+            };
+        },
+
+        'POST:/my-new-order' => sub {
+            my $args_hr = shift;
+
+            my $h = $self->{'ca_class'}->HOST();
+
+            $self->{'_order_counter'} ||= 0;
+            my $order_id = ++$self->{'_order_counter'};
+
+            my $content_hr = JSON::decode_json($args_hr->{'content'});
+            my $payload = JSON::decode_json(
+                MIME::Base64::decode_base64url($content_hr->{'payload'})
+            );
+
+            my @authz_urls;
+            for my $i (0 .. $#{ $payload->{'identifiers'} }) {
+                push @authz_urls, "https://$h/authz/$order_id-$i";
+            }
+
+            $self->{'_orders'}{$order_id} = {
+                status => 'pending',
+                identifiers => $payload->{'identifiers'},
+                authorizations => \@authz_urls,
+                finalize => "https://$h/finalize/$order_id",
+            };
+
+            return {
+                status => 'HTTP_CREATED',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                    location => "https://$h/order/$order_id",
+                },
+                content => $self->{'_orders'}{$order_id},
+            };
+        },
+
+        'POST:/authz/1-0' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => $self->_authz_content($h),
+            };
+        },
+
+        'POST:/challenge/http-01/1' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+            $self->{'_challenge_accepted'} = 1;
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => {
+                    type => 'http-01',
+                    url => "https://$h/challenge/http-01/1",
+                    token => 'test-token-abc123',
+                    status => 'valid',
+                    validated => '2026-01-01T00:00:00Z',
+                },
+            };
+        },
+
+        'POST:/order/1' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+            my $status = $self->{'_order_finalized'} ? 'valid' : 'pending';
+
+            my $order = $self->{'_orders'}{1};
+            $order->{'status'} = $status;
+
+            if ($status eq 'valid') {
+                $order->{'certificate'} = "https://$h/cert/1";
+            }
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => $order,
+            };
+        },
+
+        'POST:/finalize/1' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+            $self->{'_order_finalized'} = 1;
+
+            my $order = $self->{'_orders'}{1};
+            $order->{'status'} = 'valid';
+            $order->{'certificate'} = "https://$h/cert/1";
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => $order,
+            };
+        },
+
+        'POST:/cert/1' => sub {
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    'content-type' => 'application/pem-certificate-chain',
+                },
+                content => "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAL+FZZ...\n-----END CERTIFICATE-----\n",
             };
         },
     };
@@ -116,6 +242,31 @@ sub DESTROY {
     }
 
     return;
+}
+
+sub _authz_content {
+    my ($self, $host) = @_;
+
+    my $status = $self->{'_challenge_accepted'} ? 'valid' : 'pending';
+
+    return {
+        status => $status,
+        identifier => { type => 'dns', value => 'example.com' },
+        challenges => [
+            {
+                type => 'http-01',
+                url => "https://$host/challenge/http-01/1",
+                token => 'test-token-abc123',
+                status => $status,
+            },
+            {
+                type => 'dns-01',
+                url => "https://$host/challenge/dns-01/1",
+                token => 'test-token-dns456',
+                status => $status,
+            },
+        ],
+    };
 }
 
 sub _verify_nonce {
@@ -179,8 +330,8 @@ sub _handle_request {
     my $dispatch_key = "$method:$path";
 
     my $todo_cr = $self->{'routing'}{$dispatch_key} or do {
-        my @routes = keys %{ $opts{'routing'} };
-        die "No routing for “$dispatch_key”! (@routes)";
+        my @routes = sort keys %{ $self->{'routing'} };
+        die "No routing for '$dispatch_key'! (@routes)";
     };
 
     my $resp_hr = $todo_cr->($args_hr);
