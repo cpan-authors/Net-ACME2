@@ -230,13 +230,41 @@ sub new {
         },
 
         'POST:/cert/1' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    'content-type' => 'application/pem-certificate-chain',
+                    'link' => [
+                        "<https://$h/cert/1/alt/1>;rel=\"alternate\"",
+                        "<https://$h/cert/1/alt/2>;rel=\"alternate\"",
+                    ],
+                },
+                content => "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAL+FZZ...\n-----END CERTIFICATE-----\n",
+            };
+        },
+
+        'POST:/cert/1/alt/1' => sub {
             return {
                 status => 'HTTP_OK',
                 headers => {
                     $self->_new_nonce_header(),
                     'content-type' => 'application/pem-certificate-chain',
                 },
-                content => "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAL+FZZ...\n-----END CERTIFICATE-----\n",
+                content => "-----BEGIN CERTIFICATE-----\nALTERNATE-CHAIN-1...\n-----END CERTIFICATE-----\n",
+            };
+        },
+
+        'POST:/cert/1/alt/2' => sub {
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    'content-type' => 'application/pem-certificate-chain',
+                },
+                content => "-----BEGIN CERTIFICATE-----\nALTERNATE-CHAIN-2...\n-----END CERTIFICATE-----\n",
             };
         },
     };

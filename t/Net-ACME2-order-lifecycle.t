@@ -154,6 +154,16 @@ for my $test_case (
         my $cert_chain = $acme->get_certificate_chain($order);
         like( $cert_chain, qr/-----BEGIN CERTIFICATE-----/, 'certificate chain is PEM' );
 
+        # 9b. get_certificate_chains (alternate chains)
+        my $chains = $acme->get_certificate_chains($order);
+        is( ref $chains, 'HASH', 'get_certificate_chains() returns hashref' );
+        like( $chains->{'default'}, qr/-----BEGIN CERTIFICATE-----/, 'default chain is PEM' );
+        is( $chains->{'default'}, $cert_chain, 'default chain matches get_certificate_chain()' );
+        is( ref $chains->{'alternates'}, 'ARRAY', 'alternates is arrayref' );
+        is( scalar @{ $chains->{'alternates'} }, 2, 'two alternate chains' );
+        like( $chains->{'alternates'}[0], qr/ALTERNATE-CHAIN-1/, 'first alternate chain content' );
+        like( $chains->{'alternates'}[1], qr/ALTERNATE-CHAIN-2/, 'second alternate chain content' );
+
         # 10. poll_order (after finalize)
         my $poll_status = $acme->poll_order($order);
         is( $poll_status, 'valid', 'poll_order() returns valid' );
