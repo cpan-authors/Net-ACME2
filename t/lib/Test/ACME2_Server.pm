@@ -7,6 +7,7 @@ use Test::Crypt;
 
 use JSON ();
 use MIME::Base64 ();
+use Crypt::Perl::PK ();
 
 use Net::ACME2::HTTP_Tiny;
 
@@ -42,6 +43,7 @@ sub new {
                     newNonce => "https://$host/my-new-nonce",
                     newAccount => "https://$host/my-new-account",
                     newOrder => "https://$host/my-new-order",
+                    keyChange => "https://$host/my-key-change",
                 },
             };
         },
@@ -178,6 +180,53 @@ sub new {
                 content => \%response,
             };
         },
+
+        ($opts{'enable_key_change'} ? (
+        'POST:/my-key-change' => sub {
+            my $args_hr = shift;
+
+            # The outer JWS is already verified by _verify_nonce.
+            # Parse it to get the inner JWS (the payload).
+            my $outer_hr = JSON::decode_json($args_hr->{'content'});
+            my $inner_jws_json = MIME::Base64::decode_base64url($outer_hr->{'payload'});
+
+            # The inner JWS is a JSON-serialized JWS
+            my $inner_hr = JSON::decode_json($inner_jws_json);
+            my $inner_header = JSON::decode_json(
+                MIME::Base64::decode_base64url($inner_hr->{'protected'})
+            );
+            my $inner_payload = JSON::decode_json(
+                MIME::Base64::decode_base64url($inner_hr->{'payload'})
+            );
+
+            # Verify inner JWS signature using the new key from jwk header
+            my $new_key_obj = Crypt::Perl::PK::parse_jwk($inner_header->{'jwk'});
+            my $is_ecc = $new_key_obj->isa('Crypt::Perl::ECDSA::PublicKey');
+            my $to_pem_method = $is_ecc ? 'to_pem_with_curve_name' : 'to_pem';
+
+            Test::Crypt::verify(
+                $new_key_obj->$to_pem_method(),
+                "$inner_hr->{'protected'}.$inner_hr->{'payload'}",
+                MIME::Base64::decode_base64url($inner_hr->{'signature'}),
+            );
+
+            # Store for test assertions
+            $self->{'_last_key_change'} = {
+                inner_header  => $inner_header,
+                inner_payload => $inner_payload,
+            };
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => {},
+            };
+        },
+        ) : ()),
+
         'POST:/my-new-order' => sub {
             my $args_hr = shift;
 
@@ -365,6 +414,11 @@ sub new {
     }
 
     return $self;
+}
+
+sub last_key_change {
+    my ($self) = @_;
+    return $self->{'_last_key_change'};
 }
 
 sub DESTROY {

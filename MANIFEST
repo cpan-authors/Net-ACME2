@@ -65,5 +65,6 @@ t/Net-ACME2-HTTP.t
 t/Net-ACME2-JWTMaker.t
 t/Net-ACME2-order-lifecycle.t
 t/Net-ACME2-PromiseUtil.t
+t/Net-ACME2-key-change.t
 t/Net-ACME2.t
 t/Net-ACME2_pre_rename.t
