@@ -1,16 +1,8 @@
-.github/workflows/linux.yml
-.github/workflows/macos.yml
-.github/workflows/windows.yml
-.gitignore
-.travis.yml
+AI_POLICY.md
 Changes
-LICENSE
-MANIFEST
-Makefile.PL
-README.md
-eval_bug.readme
 examples/dns-01.pl
 examples/dns-01_async.pl
+examples/eval_bug.readme
 examples/http-01.pl
 examples/http-01_async.pl
 examples/lib/Net_ACME2_Example.pm
@@ -52,6 +44,13 @@ lib/Net/ACME2/X/InvalidCharacters.pm
 lib/Net/ACME2/X/InvalidParameter.pm
 lib/Net/ACME2/X/UnexpectedResponse.pm
 lib/Net/ACME2/X/UnrecognizedKey.pm
+LICENSE
+Makefile.PL
+MANIFEST			This list of files
+MANIFEST.SKIP
+README.md
+t/lib/Test/ACME2_Server.pm
+t/lib/Test/Crypt.pm
 t/Net-ACME2-Challenge-http_01-Handler.t
 t/Net-ACME2-Challenge-tls_alpn_01.t
 t/Net-ACME2-Challenge.t
@@ -59,5 +58,3 @@ t/Net-ACME2-Error.t
 t/Net-ACME2-PromiseUtil.t
 t/Net-ACME2.t
 t/Net-ACME2_pre_rename.t
-t/lib/Test/ACME2_Server.pm
-t/lib/Test/Crypt.pm

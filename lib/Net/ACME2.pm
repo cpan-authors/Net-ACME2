@@ -10,6 +10,8 @@ BEGIN {
 
 =encoding utf-8
 
+=for markdown [![testsuite](https://github.com/cpan-authors/Net-ACME2/actions/workflows/testsuite.yml/badge.svg)](https://github.com/cpan-authors/Net-ACME2/actions/workflows/testsuite.yml)
+
 =head1 NAME
 
 Net::ACME2 - Client logic for the ACME (Let's Encrypt) protocol
