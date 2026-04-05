@@ -54,11 +54,11 @@ WriteMakefile(
         resources => {
             repository => {
                 type => 'git',
-                url  => 'https://github.com/FGasper/p5-Net-ACME2.git',
-                web  => 'https://github.com/FGasper/p5-Net-ACME2',
+                url  => 'https://github.com/cpan-authors/Net-ACME2.git',
+                web  => 'https://github.com/cpan-authors/Net-ACME2',
             },
             bugtracker => {
-                web => 'https://github.com/FGasper/p5-Net-ACME2/issues',
+                web => 'https://github.com/cpan-authors/Net-ACME2/issues',
             },
         },
 
