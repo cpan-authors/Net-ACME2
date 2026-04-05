@@ -100,7 +100,7 @@ sub challenges {
         $class .= "::$module_leaf";
 
         #use unknown for unknown challenges - this ensures out of band challenges (for example: DNS-PERSIST-01) can be completed even if the module has no built-in support for the challenge itself.
-        if !$class->can('new') {
+        if (!$class->can('new')) {
          $class = "Net::ACME2::Challenge::unknown";
         }
 
