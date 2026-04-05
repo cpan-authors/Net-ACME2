@@ -88,6 +88,8 @@ sub new {
 
             my $host = $self->{'ca_class'}->HOST();
 
+            $response{'orders'} = "https://$host/account-orders";
+
             return {
                 status => "HTTP_$status",
                 headers => {
@@ -96,6 +98,26 @@ sub new {
                     location => "https://$host/key/" . Digest::MD5::md5_hex($key_pem),
                 },
                 content => \%response,
+            };
+        },
+
+        'POST:/account-orders' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+
+            my @order_urls;
+            for my $id (sort { $a <=> $b } keys %{ $self->{'_orders'} || {} }) {
+                push @order_urls, "https://$h/order/$id";
+            }
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => {
+                    orders => \@order_urls,
+                },
             };
         },
 

@@ -366,20 +366,62 @@ sub create_account {
 
             $self->{'_http'}->set_key_id( $self->{'_key_id'} );
 
-            return 0 if $resp->status() == _HTTP_OK;
+            my $is_new;
 
-            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+            if ($resp->status() == _HTTP_OK) {
+                $is_new = 0;
+            }
+            elsif ($resp->status() == _HTTP_CREATED) {
+                $is_new = 1;
+            }
+            else {
+                $resp->die_because_unexpected();
+            }
 
             my $struct = $resp->content_struct();
 
             if ($struct) {
-                for my $name (newAccount_booleans()) {
-                    next if !exists $struct->{$name};
-                    ($struct->{$name} &&= 1) ||= 0;
+                $self->{'_orders_url'} = $struct->{'orders'} if $struct->{'orders'};
+
+                if ($is_new) {
+                    for my $name (newAccount_booleans()) {
+                        next if !exists $struct->{$name};
+                        ($struct->{$name} &&= 1) ||= 0;
+                    }
                 }
             }
 
-            return 1;
+            return $is_new;
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
+=head2 promise(@order_urls) = I<OBJ>->get_orders()
+
+Returns a list of order URLs associated with the account. This
+corresponds to the C<orders> field of the ACME account object
+(RFC 8555, section 7.1.2.1).
+
+Not all ACME servers provide the C<orders> URL (e.g., Let's Encrypt
+does not). If the URL is unavailable, this method throws an exception.
+
+=cut
+
+sub get_orders {
+    my ($self) = @_;
+
+    my $orders_url = $self->{'_orders_url'} or do {
+        _die_generic('No orders URL available. The ACME server may not support this feature (RFC 8555 section 7.1.2.1).');
+    };
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get($orders_url),
+        sub {
+            my $resp = shift;
+
+            return @{ $resp->content_struct()->{'orders'} || [] };
         },
     );
 }
