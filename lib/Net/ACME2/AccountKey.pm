@@ -60,7 +60,6 @@ sub new {
             }
 
             $obj = Crypt::OpenSSL::RSA->new_private_key($pem);
-            $obj->use_pkcs1_padding();
             $obj->use_sha256_hash();
 
             $engine = 'crypt_openssl_rsa';
