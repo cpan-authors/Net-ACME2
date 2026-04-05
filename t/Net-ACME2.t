@@ -142,10 +142,33 @@ for my $t (@alg_key) {
                     }),
                     'update_account() returns updated account object',
                 );
+
+                #----------------------------------------------------------------------
+                # deactivate_account()
+
+                lives_ok(
+                    sub { $acme->deactivate_account() },
+                    'deactivate_account() succeeds',
+                );
             },
             "no errors: $alg, $format",
         );
     }
+}
+
+# Test that deactivate_account() requires key_id
+{
+    my $SERVER_OBJ = Test::ACME2_Server->new(
+        ca_class => 'MyCA',
+    );
+
+    my $acme = MyCA->new( key => $_RSA_KEY );
+
+    throws_ok(
+        sub { $acme->deactivate_account() },
+        qr/key ID/i,
+        'deactivate_account() without key_id throws',
+    );
 }
 
 done_testing();

@@ -166,6 +166,10 @@ sub new {
                 status => 'valid',
             );
 
+            if (($payload->{'status'} || '') eq 'deactivated') {
+                $response{'status'} = 'deactivated';
+            }
+
             if ($payload->{'contact'}) {
                 $response{'contact'} = $payload->{'contact'};
             }
