@@ -1,8 +1,5 @@
-.github/workflows/linux.yml
-.github/workflows/macos.yml
-.github/workflows/windows.yml
+.github/workflows/testsuite.yml
 .gitignore
-.travis.yml
 Changes
 LICENSE
 MANIFEST
