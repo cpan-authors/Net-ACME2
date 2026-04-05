@@ -7,7 +7,7 @@ WriteMakefile(
     ABSTRACT_FROM => 'lib/Net/ACME2.pm',
     VERSION_FROM => 'lib/Net/ACME2.pm',
     LICENSE      => 'perl',
-    MIN_PERL_VERSION => '5.10.0',
+    MIN_PERL_VERSION => '5.14.0',
 
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => '6.64',
