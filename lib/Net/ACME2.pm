@@ -928,6 +928,84 @@ sub _fetch_next_alternate {
 
 #----------------------------------------------------------------------
 
+=head2 promise() = I<OBJ>->revoke_certificate( $CERT, %OPTS )
+
+Revokes a certificate per RFC 8555 section 7.6.
+$CERT may be in PEM or DER format.
+
+%OPTS is:
+
+=over
+
+=item * C<reason> - Optional. An integer revocation reason code per
+RFC 5280 section 5.3.1 (e.g., 0 = unspecified, 1 = keyCompromise,
+4 = superseded).
+
+=item * C<key> - Optional. A PEM or DER private key to sign the
+revocation request. This allows revoking a certificate using the
+certificate's own key rather than the account key.
+
+=back
+
+=cut
+
+sub revoke_certificate {
+    my ($self, $cert, %opts) = @_;
+
+    _die_generic('Need a certificate!') if !defined $cert || !length $cert;
+
+    my $cert_der;
+    if (index($cert, '-----') == 0) {
+        $cert_der = Crypt::Format::pem2der($cert);
+    }
+    else {
+        $cert_der = $cert;
+    }
+
+    my %payload = (
+        certificate => MIME::Base64::encode_base64url($cert_der),
+    );
+
+    $payload{'reason'} = $opts{'reason'} if defined $opts{'reason'};
+
+    if ($opts{'key'}) {
+        return $self->_revoke_with_key(\%payload, $opts{'key'});
+    }
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post( 'revokeCert', \%payload ),
+        sub { undef },
+    );
+}
+
+sub _revoke_with_key {
+    my ($self, $payload_hr, $key) = @_;
+
+    my $key_obj = Net::ACME2::AccountKey->new($key);
+
+    my $temp_http = Net::ACME2::HTTP->new(
+        key => $key_obj,
+    );
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_get_directory(),
+        sub {
+            my $dir_hr = shift;
+
+            my $url = $dir_hr->{'revokeCert'} or _die_generic('No "revokeCert" in directory!');
+
+            $temp_http->set_new_nonce_url( $dir_hr->{'newNonce'} );
+
+            return Net::ACME2::PromiseUtil::then(
+                $temp_http->post_full_jwt( $url, $payload_hr ),
+                sub { undef },
+            );
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
 sub _key_thumbprint {
     my ($self) = @_;
 
