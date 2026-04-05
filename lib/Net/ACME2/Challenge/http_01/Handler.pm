@@ -81,7 +81,8 @@ sub DESTROY {
     my ($self) = @_;
 
     if ( $> != $self->{'_euid'} ) {
-        die "XXX attempt to delete “$self->{'_path'}” with EUID $>; created with EUID $self->{'_euid'}!";
+        warn "XXX attempt to delete “$self->{'_path'}” with EUID $>; created with EUID $self->{'_euid'}!";
+        return;
     }
 
     _unlink_if_exists( $self->{'_path'} );
@@ -117,7 +118,7 @@ sub _unlink_if_exists {
     local ( $!, $^E );
 
     eval { unlink $path; 1 } or do {
-        die if $@->errno() != Errno::ENOENT();
+        warn $@ if $@->errno() != Errno::ENOENT();
     };
 
     $@ = $eval_err;
