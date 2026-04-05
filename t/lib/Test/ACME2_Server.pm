@@ -65,6 +65,36 @@ sub new {
 
             my $key_pem = $key_obj->$pem_method();
 
+            # Validate EAB if the server requires it
+            if ($self->{'eab_credentials'}) {
+                my $eab = $payload->{'externalAccountBinding'}
+                    or die "Server requires externalAccountBinding!";
+
+                my $eab_header_hr = JSON::decode_json(
+                    MIME::Base64::decode_base64url( $eab->{'protected'} )
+                );
+
+                my $eab_kid = $eab_header_hr->{'kid'}
+                    or die "EAB missing kid!";
+
+                my $mac_key = $self->{'eab_credentials'}{$eab_kid}
+                    or die "Unknown EAB kid: $eab_kid";
+
+                my $host = $self->{'ca_class'}->HOST();
+                my $expected_url = "https://$host/my-new-account";
+
+                die "EAB url mismatch!" if ($eab_header_hr->{'url'} || '') ne $expected_url;
+                die "EAB must not have nonce!" if exists $eab_header_hr->{'nonce'};
+
+                my ($eab_hdr, $eab_payload) = Test::Crypt::decode_eab_jws($eab, $mac_key);
+
+                # EAB payload must be the account public key JWK
+                my $outer_jwk = $header->{'jwk'};
+                my $cmp_json = JSON->new()->canonical(1);
+                die "EAB payload JWK mismatch!"
+                    if $cmp_json->encode($eab_payload) ne $cmp_json->encode($outer_jwk);
+            }
+
             my $status;
             if ($self->{'_registered_keys'}{$key_pem}) {
                 $status = 'OK';

@@ -170,6 +170,7 @@ see Net::Curl::Promiser’s documentation for more details.
 #----------------------------------------------------------------------
 
 use Crypt::Format;
+use Digest::SHA  ();
 use MIME::Base64 ();
 
 use Net::ACME2::AccountKey;
@@ -332,6 +333,24 @@ or 0 if the account already existed.
 
 NB: C<create_new_account()> is an alias for this method.
 
+=head3 External Account Binding (EAB)
+
+Some CAs (e.g., ZeroSSL, Google Trust Services) require external account
+binding per RFC 8555 Section 7.3.4. To use EAB, pass the
+C<externalAccountBinding> option:
+
+    $acme->create_account(
+        termsOfServiceAgreed => 1,
+        externalAccountBinding => {
+            kid       => $eab_key_id,
+            mac_key   => $eab_hmac_key,     # base64url-encoded
+            algorithm => 'HS256',            # optional; default HS256
+        },
+    );
+
+C<kid> and C<mac_key> are provided out-of-band by the CA. C<algorithm>
+defaults to C<HS256> and may also be C<HS384> or C<HS512>.
+
 =cut
 
 sub create_account {
@@ -342,8 +361,30 @@ sub create_account {
         ($opts{$name} &&= JSON::true()) ||= JSON::false();
     }
 
+    my $eab = delete $opts{'externalAccountBinding'};
+
+    my $post_promise;
+
+    if ($eab) {
+        $post_promise = Net::ACME2::PromiseUtil::then(
+            $self->_get_directory(),
+            sub {
+                my $dir_hr = shift;
+
+                my $url = $dir_hr->{'newAccount'} or _die_generic('No "newAccount" in directory!');
+
+                $opts{'externalAccountBinding'} = $self->_build_eab_jws($eab, $url);
+
+                return $self->_post_url( $url, \%opts, 'post_full_jwt' );
+            },
+        );
+    }
+    else {
+        $post_promise = $self->_post( 'newAccount', \%opts );
+    }
+
     return Net::ACME2::PromiseUtil::then(
-        $self->_post( 'newAccount', \%opts ),
+        $post_promise,
         sub {
             my ($resp) = @_;
 
@@ -444,6 +485,49 @@ sub update_account {
             return $resp->content_struct();
         },
     );
+}
+
+sub _build_eab_jws {
+    my ($self, $eab, $url) = @_;
+
+    my $kid = $eab->{'kid'} or _die_generic('EAB requires "kid"');
+    my $mac_key_b64u = $eab->{'mac_key'} or _die_generic('EAB requires "mac_key"');
+    my $alg = $eab->{'algorithm'} || 'HS256';
+
+    my $mac_key = MIME::Base64::decode_base64url($mac_key_b64u);
+
+    my $jwk = $self->_key_obj()->get_struct_for_public_jwk();
+
+    my $json = JSON->new()->canonical(1);
+
+    my $b64u_payload = MIME::Base64::encode_base64url( $json->encode($jwk) );
+
+    my $header = { alg => $alg, kid => $kid, url => $url };
+    my $b64u_header = MIME::Base64::encode_base64url( $json->encode($header) );
+
+    my $signing_input = "$b64u_header.$b64u_payload";
+
+    my $hmac_cr = _eab_hmac_func($alg);
+    my $signature = $hmac_cr->($signing_input, $mac_key);
+    my $b64u_signature = MIME::Base64::encode_base64url($signature);
+
+    return {
+        protected => $b64u_header,
+        payload   => $b64u_payload,
+        signature => $b64u_signature,
+    };
+}
+
+my %_EAB_HMAC = (
+    HS256 => \&Digest::SHA::hmac_sha256,
+    HS384 => \&Digest::SHA::hmac_sha384,
+    HS512 => \&Digest::SHA::hmac_sha512,
+);
+
+sub _eab_hmac_func {
+    my ($alg) = @_;
+
+    return $_EAB_HMAC{$alg} || _die_generic("Unsupported EAB algorithm: \"$alg\"");
 }
 
 #----------------------------------------------------------------------
