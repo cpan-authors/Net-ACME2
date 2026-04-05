@@ -559,4 +559,140 @@ my $acme_key = Net::ACME2::AccountKey->new($_KEY_PEM);
     );
 }
 
+#----------------------------------------------------------------------
+# Test: _xform_http_error re-throws exception intact (not via fragile $@)
+#
+# Historically, _xform_http_error did `$@ = $exc; die;` which relies on
+# $@ surviving between assignment and die. If any DESTROY method (or
+# other code) runs an eval{} in between, $@ gets clobbered to "" and
+# the die propagates an empty/wrong exception. This test uses a guard
+# object whose DESTROY clobbers $@ to prove the exception survives.
+#----------------------------------------------------------------------
+
+{
+    package ClobberGuard;
+    sub new { bless {}, shift }
+    sub DESTROY { eval { 1 } }  # clobbers $@
+}
+
+{
+    my $mock = MockUA->new(responses => []);
+
+    # Make the UA throw an HTTP::Protocol error with a non-ACME body
+    # so _xform_http_error doesn't convert it to an ACME exception —
+    # it falls through to the bare re-throw path.
+    no warnings 'redefine';
+    local *MockUA::request = sub {
+        my ($self, $method, $url, $args) = @_;
+
+        # Create a guard that will clobber $@ when it goes out of scope
+        my $guard = ClobberGuard->new();
+
+        die Net::ACME2::X->create(
+            'HTTP::Protocol',
+            {
+                method  => 'GET',
+                url     => $url,
+                status  => 500,
+                reason  => 'Internal Server Error',
+                headers => {},
+                content => 'not json',
+            },
+        );
+    };
+    use warnings 'redefine';
+
+    my $http = Net::ACME2::HTTP->new(
+        key => $acme_key,
+        ua  => $mock,
+    );
+
+    my $err;
+    eval {
+        $http->get('https://example.com/directory');
+        1;
+    } or $err = $@;
+
+    ok($err, '_xform_http_error re-throws when DESTROY clobbers $@');
+    ok(
+        eval { $err->isa('Net::ACME2::X::HTTP::Protocol') },
+        '_xform_http_error preserves exception type (not empty string)',
+    ) or diag("Got: " . (defined $err ? $err : "(undef)"));
+}
+
+#----------------------------------------------------------------------
+# Test: _post catch block re-throws non-badNonce errors intact
+#
+# Same $@ clobbering concern as _xform_http_error, but in the _post
+# method's catch callback. A non-badNonce ACME error must survive
+# re-throw even when destructors clobber $@.
+#----------------------------------------------------------------------
+
+{
+    my $mock = MockUA->new(responses => [
+        # HEAD for nonce
+        {
+            status  => 'HTTP_NO_CONTENT',
+            headers => { 'replay-nonce' => 'nonce-rethrow' },
+            content => '',
+        },
+    ]);
+
+    no warnings 'redefine';
+    my $orig_request = \&MockUA::request;
+    local *MockUA::request = sub {
+        my ($self, $method, $url, $args) = @_;
+
+        if ($method eq 'POST') {
+            push @{ $self->{requests} }, {
+                method => $method,
+                url    => $url,
+                args   => $args,
+            };
+
+            # Guard that clobbers $@ on destruction
+            my $guard = ClobberGuard->new();
+
+            die Net::ACME2::X->create(
+                'HTTP::Protocol',
+                {
+                    method  => 'POST',
+                    url     => $url,
+                    status  => 403,
+                    reason  => 'Forbidden',
+                    headers => { 'replay-nonce' => 'nonce-err-rethrow' },
+                    content => JSON::encode_json({
+                        type   => 'urn:ietf:params:acme:error:unauthorized',
+                        detail => 'Not authorized',
+                        status => 403,
+                    }),
+                },
+            );
+        }
+
+        return $orig_request->($self, $method, $url, $args);
+    };
+    use warnings 'redefine';
+
+    my $http = Net::ACME2::HTTP->new(
+        key    => $acme_key,
+        key_id => 'https://example.com/acct/1',
+        ua     => $mock,
+    );
+
+    $http->set_new_nonce_url('https://example.com/new-nonce');
+
+    my $err;
+    eval {
+        $http->post_key_id('https://example.com/resource', '');
+        1;
+    } or $err = $@;
+
+    ok($err, '_post catch re-throws non-badNonce error');
+    ok(
+        eval { $err->isa('Net::ACME2::X::ACME') },
+        '_post catch preserves ACME exception type (not empty string)',
+    ) or diag("Got: " . (defined $err ? $err : "(undef)"));
+}
+
 done_testing();
