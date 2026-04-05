@@ -22,6 +22,9 @@ requires 'Crypt::OpenSSL::RSA';
 requires 'CryptX';
 requires 'Net::Curl::Multi';
 
+# Undeclared dependency modules
+requires 'MIME::Base64';
+
 on 'configure' => sub {
     requires 'ExtUtils::MakeMaker' => '6.64';
 };
