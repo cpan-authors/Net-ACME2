@@ -113,6 +113,8 @@ a new version of this module.
 
 =item * Supports blocking and (experimentally) non-blocking I/O.
 
+=item * L<Account key rollover|https://www.rfc-editor.org/rfc/rfc8555.html#section-7.3.5> via C<change_key()>.
+
 =item * L<Retry POST on C<badNonce> errors.|https://tools.ietf.org/html/rfc8555#section-6.5>
 
 =item * This is a pure-Perl solution. Most of its dependencies are
@@ -532,6 +534,69 @@ sub _eab_hmac_func {
 
 #----------------------------------------------------------------------
 
+=head2 promise() = I<OBJ>->change_key( $NEW_KEY )
+
+Rolls over the account key per RFC 8555 section 7.3.5. $NEW_KEY is
+the new private key in PEM or DER format (anything that
+C<Net::ACME2::AccountKey> can parse).
+
+On success, the object's key is updated to the new key so that
+subsequent requests use it.
+
+=cut
+
+sub change_key {
+    my ($self, $new_key_pem_or_der) = @_;
+
+    _die_generic('Need "new key"!') if !$new_key_pem_or_der;
+
+    $self->_require_key_id({});
+
+    my $new_key_obj = Net::ACME2::AccountKey->new($new_key_pem_or_der);
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_get_directory(),
+        sub {
+            my $dir_hr = shift;
+
+            my $key_change_url = $dir_hr->{'keyChange'} or _die_generic('Directory lacks "keyChange".');
+
+            my $old_jwk = $self->_key_obj()->get_struct_for_public_jwk();
+
+            my $inner_payload = {
+                account => $self->{'_key_id'},
+                oldKey  => $old_jwk,
+            };
+
+            my $new_jwt_maker = $self->_make_jwt_maker($new_key_obj);
+
+            my $inner_jws = $new_jwt_maker->create_full_jws_for_url(
+                payload => $inner_payload,
+                url     => $key_change_url,
+                extra_headers => {},
+            );
+
+            return Net::ACME2::PromiseUtil::then(
+                $self->{'_http'}->post_key_change($key_change_url, $inner_jws),
+                sub {
+                    my $resp = shift;
+
+                    $resp->die_because_unexpected() if $resp->status() != _HTTP_OK;
+
+                    $self->{'_key'} = $new_key_pem_or_der;
+                    $self->{'_key_obj'} = $new_key_obj;
+                    $self->{'_key_thumbprint'} = undef;
+                    $self->{'_http'}->update_key($new_key_obj);
+
+                    return;
+                },
+            );
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
 =head2 promise($order) = I<OBJ>->create_order( %OPTS )
 
 Returns a L<Net::ACME2::Order> object. %OPTS is as described in the
@@ -927,6 +992,31 @@ sub _key_obj {
     my ($self) = @_;
 
     return $self->{'_key_obj'} ||= Net::ACME2::AccountKey->new($self->{'_key'});
+}
+
+sub _make_jwt_maker {
+    my ($self, $key_obj) = @_;
+
+    my $class;
+
+    my $key_type = $key_obj->get_type();
+
+    if ($key_type eq 'rsa') {
+        $class = 'Net::ACME2::JWTMaker::RSA';
+    }
+    elsif ($key_type eq 'ecdsa') {
+        $class = 'Net::ACME2::JWTMaker::ECC';
+    }
+    else {
+        _die_generic("Unrecognized key type: \"$key_type\"");
+    }
+
+    if (!$class->can('new')) {
+        require Module::Runtime;
+        Module::Runtime::use_module($class);
+    }
+
+    return $class->new( key => $key_obj );
 }
 
 sub _set_http {

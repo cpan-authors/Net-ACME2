@@ -109,6 +109,23 @@ sub post_key_id {
     );
 }
 
+# promise
+# ACME spec 7.3.5: key change uses a pre-built inner JWS as payload
+sub post_key_change {
+    my ($self, $url, $inner_jws) = @_;
+
+    return $self->_post( 'create_key_id_jws', $url, $inner_jws );
+}
+
+sub update_key {
+    my ($self, $new_key_obj) = @_;
+
+    $self->{'_acme_key'} = $new_key_obj;
+    delete $self->{'_jwt_maker'};
+
+    return $self;
+}
+
 #----------------------------------------------------------------------
 
 # promise
