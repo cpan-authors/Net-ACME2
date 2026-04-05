@@ -121,6 +121,33 @@ sub new {
             };
         },
 
+        'POST:/key' => sub {
+            my $args_hr = shift;
+
+            my $content_hr = JSON::decode_json($args_hr->{'content'});
+            my $payload = JSON::decode_json(
+                MIME::Base64::decode_base64url($content_hr->{'payload'})
+            );
+
+            my %response = (
+                status => 'valid',
+            );
+
+            if ($payload->{'contact'}) {
+                $response{'contact'} = $payload->{'contact'};
+            }
+
+            my $host = $self->{'ca_class'}->HOST();
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => \%response,
+            };
+        },
         'POST:/my-new-order' => sub {
             my $args_hr = shift;
 
@@ -400,7 +427,18 @@ sub _handle_request {
 
     my $dispatch_key = "$method:$path";
 
-    my $todo_cr = $self->{'routing'}{$dispatch_key} or do {
+    my $todo_cr = $self->{'routing'}{$dispatch_key};
+
+    if (!$todo_cr) {
+        for my $route (keys %{ $self->{'routing'} }) {
+            if (index($dispatch_key, $route) == 0) {
+                $todo_cr = $self->{'routing'}{$route};
+                last;
+            }
+        }
+    }
+
+    $todo_cr or do {
         my @routes = sort keys %{ $self->{'routing'} };
         die "No routing for '$dispatch_key'! (@routes)";
     };
