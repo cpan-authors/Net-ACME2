@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Test::More;
+use Test::Deep;
 use Test::Exception;
 use Test::FailWarnings;
 
@@ -125,6 +126,22 @@ for my $t (@alg_key) {
                 is( $created, 0, 'create_account() if account already exists' );
 
                 is( $acme->key_id(), $key_id, 'key_id() stays the same' );
+
+                #----------------------------------------------------------------------
+                # update_account()
+
+                my $updated = $acme->update_account(
+                    contact => ['mailto:new@example.com'],
+                );
+
+                cmp_deeply(
+                    $updated,
+                    superhashof({
+                        contact => ['mailto:new@example.com'],
+                        status  => 'valid',
+                    }),
+                    'update_account() returns updated account object',
+                );
             },
             "no errors: $alg, $format",
         );

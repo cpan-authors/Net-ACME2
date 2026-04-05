@@ -154,6 +154,16 @@ for my $test_case (
         my $cert_chain = $acme->get_certificate_chain($order);
         like( $cert_chain, qr/-----BEGIN CERTIFICATE-----/, 'certificate chain is PEM' );
 
+        # 9b. get_certificate_chains (alternate chains)
+        my $chains = $acme->get_certificate_chains($order);
+        is( ref $chains, 'HASH', 'get_certificate_chains() returns hashref' );
+        like( $chains->{'default'}, qr/-----BEGIN CERTIFICATE-----/, 'default chain is PEM' );
+        is( $chains->{'default'}, $cert_chain, 'default chain matches get_certificate_chain()' );
+        is( ref $chains->{'alternates'}, 'ARRAY', 'alternates is arrayref' );
+        is( scalar @{ $chains->{'alternates'} }, 2, 'two alternate chains' );
+        like( $chains->{'alternates'}[0], qr/ALTERNATE-CHAIN-1/, 'first alternate chain content' );
+        like( $chains->{'alternates'}[1], qr/ALTERNATE-CHAIN-2/, 'second alternate chain content' );
+
         # 10. poll_order (after finalize)
         my $poll_status = $acme->poll_order($order);
         is( $poll_status, 'valid', 'poll_order() returns valid' );
@@ -221,6 +231,29 @@ subtest 'finalize_order with DER CSR' => sub {
     );
 };
 
+subtest 'deactivate_authorization' => sub {
+    my $SERVER_OBJ = Test::ACME2_Server->new(
+        ca_class => 'MyCA',
+    );
+
+    my $acme = MyCA->new( key => $_P256_KEY );
+    $acme->create_account( termsOfServiceAgreed => 1 );
+
+    my $order = $acme->create_order(
+        identifiers => [
+            { type => 'dns', value => 'example.com' },
+        ],
+    );
+
+    my @authz_urls = $order->authorizations();
+    my $authz = $acme->get_authorization( $authz_urls[0] );
+    is( $authz->status(), 'pending', 'authorization starts as pending' );
+
+    my $status = $acme->deactivate_authorization($authz);
+    is( $status, 'deactivated', 'deactivate_authorization() returns deactivated' );
+    is( $authz->status(), 'deactivated', 'authorization object updated to deactivated' );
+};
+
 subtest 'Order identifiers() returns copies' => sub {
     my $SERVER_OBJ = Test::ACME2_Server->new(
         ca_class => 'MyCA',
@@ -244,6 +277,48 @@ subtest 'Order identifiers() returns copies' => sub {
     $idents[0]{'value'} = 'hacked.com';
     my @idents2 = $order->identifiers();
     is( $idents2[0]{'value'}, 'example.com', 'identifiers() returns defensive copies' );
+};
+
+subtest 'retry_after exposed from poll responses' => sub {
+    my $SERVER_OBJ = Test::ACME2_Server->new(
+        ca_class => 'MyCA',
+    );
+
+    my $acme = MyCA->new( key => $_P256_KEY );
+    $acme->create_account( termsOfServiceAgreed => 1 );
+
+    my $order = $acme->create_order(
+        identifiers => [
+            { type => 'dns', value => 'example.com' },
+        ],
+    );
+
+    my @authz_urls = $order->authorizations();
+    my $authz = $acme->get_authorization( $authz_urls[0] );
+
+    # Before polling, retry_after should be undef
+    is( $order->retry_after(), undef, 'Order retry_after undef before poll' );
+    is( $authz->retry_after(), undef, 'Authorization retry_after undef before poll' );
+
+    # Set Retry-After on the mock server
+    $SERVER_OBJ->set_retry_after( authz => 10, order => 30 );
+
+    # Poll authorization — should pick up Retry-After
+    $acme->poll_authorization($authz);
+    is( $authz->retry_after(), 10, 'Authorization retry_after set from header' );
+
+    # Poll order — should pick up Retry-After
+    $acme->poll_order($order);
+    is( $order->retry_after(), 30, 'Order retry_after set from header' );
+
+    # Clear Retry-After and poll again — should become undef
+    $SERVER_OBJ->set_retry_after( authz => undef, order => undef );
+
+    $acme->poll_authorization($authz);
+    is( $authz->retry_after(), undef, 'Authorization retry_after cleared when header absent' );
+
+    $acme->poll_order($order);
+    is( $order->retry_after(), undef, 'Order retry_after cleared when header absent' );
 };
 
 done_testing();

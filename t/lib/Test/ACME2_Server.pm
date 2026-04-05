@@ -118,6 +118,8 @@ sub new {
 
             my $host = $self->{'ca_class'}->HOST();
 
+            $response{'orders'} = "https://$host/account-orders";
+
             return {
                 status => "HTTP_$status",
                 headers => {
@@ -129,6 +131,53 @@ sub new {
             };
         },
 
+        'POST:/account-orders' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+
+            my @order_urls;
+            for my $id (sort { $a <=> $b } keys %{ $self->{'_orders'} || {} }) {
+                push @order_urls, "https://$h/order/$id";
+            }
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => {
+                    orders => \@order_urls,
+                },
+            };
+        },
+
+        'POST:/key' => sub {
+            my $args_hr = shift;
+
+            my $content_hr = JSON::decode_json($args_hr->{'content'});
+            my $payload = JSON::decode_json(
+                MIME::Base64::decode_base64url($content_hr->{'payload'})
+            );
+
+            my %response = (
+                status => 'valid',
+            );
+
+            if ($payload->{'contact'}) {
+                $response{'contact'} = $payload->{'contact'};
+            }
+
+            my $host = $self->{'ca_class'}->HOST();
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    _CONTENT_TYPE_JSON(),
+                },
+                content => \%response,
+            };
+        },
         'POST:/my-new-order' => sub {
             my $args_hr = shift;
 
@@ -166,13 +215,34 @@ sub new {
         },
 
         'POST:/authz/1-0' => sub {
+            my $args_hr = shift;
             my $h = $self->{'ca_class'}->HOST();
 
+            # Check if this is a deactivation request
+            my $content_hr = JSON::decode_json($args_hr->{'content'});
+            my $payload_b64 = $content_hr->{'payload'};
+
+            # Non-empty payload means it's a status update, not POST-as-GET
+            if ($payload_b64 && $payload_b64 ne '') {
+                my $payload = JSON::decode_json(
+                    MIME::Base64::decode_base64url($payload_b64)
+                );
+
+                if ($payload->{'status'} && $payload->{'status'} eq 'deactivated') {
+                    $self->{'_authz_deactivated'} = 1;
+                }
+            }
+
+            my %extra_headers;
+            if ($self->{'_retry_after_authz'}) {
+                $extra_headers{'retry-after'} = $self->{'_retry_after_authz'};
+            }
             return {
                 status => 'HTTP_OK',
                 headers => {
                     $self->_new_nonce_header(),
                     _CONTENT_TYPE_JSON(),
+                    %extra_headers,
                 },
                 content => $self->_authz_content($h),
             };
@@ -209,11 +279,17 @@ sub new {
                 $order->{'certificate'} = "https://$h/cert/1";
             }
 
+            my %extra_headers;
+            if ($self->{'_retry_after_order'}) {
+                $extra_headers{'retry-after'} = $self->{'_retry_after_order'};
+            }
+
             return {
                 status => 'HTTP_OK',
                 headers => {
                     $self->_new_nonce_header(),
                     _CONTENT_TYPE_JSON(),
+                    %extra_headers,
                 },
                 content => $order,
             };
@@ -238,13 +314,41 @@ sub new {
         },
 
         'POST:/cert/1' => sub {
+            my $h = $self->{'ca_class'}->HOST();
+
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    'content-type' => 'application/pem-certificate-chain',
+                    'link' => [
+                        "<https://$h/cert/1/alt/1>;rel=\"alternate\"",
+                        "<https://$h/cert/1/alt/2>;rel=\"alternate\"",
+                    ],
+                },
+                content => "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAL+FZZ...\n-----END CERTIFICATE-----\n",
+            };
+        },
+
+        'POST:/cert/1/alt/1' => sub {
             return {
                 status => 'HTTP_OK',
                 headers => {
                     $self->_new_nonce_header(),
                     'content-type' => 'application/pem-certificate-chain',
                 },
-                content => "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAL+FZZ...\n-----END CERTIFICATE-----\n",
+                content => "-----BEGIN CERTIFICATE-----\nALTERNATE-CHAIN-1...\n-----END CERTIFICATE-----\n",
+            };
+        },
+
+        'POST:/cert/1/alt/2' => sub {
+            return {
+                status => 'HTTP_OK',
+                headers => {
+                    $self->_new_nonce_header(),
+                    'content-type' => 'application/pem-certificate-chain',
+                },
+                content => "-----BEGIN CERTIFICATE-----\nALTERNATE-CHAIN-2...\n-----END CERTIFICATE-----\n",
             };
         },
     };
@@ -274,10 +378,21 @@ sub DESTROY {
     return;
 }
 
+sub set_retry_after {
+    my ($self, %opts) = @_;
+
+    $self->{'_retry_after_authz'} = $opts{'authz'};
+    $self->{'_retry_after_order'} = $opts{'order'};
+
+    return;
+}
+
 sub _authz_content {
     my ($self, $host) = @_;
 
-    my $status = $self->{'_challenge_accepted'} ? 'valid' : 'pending';
+    my $status = $self->{'_authz_deactivated'} ? 'deactivated'
+               : $self->{'_challenge_accepted'} ? 'valid'
+               : 'pending';
 
     return {
         status => $status,
@@ -359,7 +474,18 @@ sub _handle_request {
 
     my $dispatch_key = "$method:$path";
 
-    my $todo_cr = $self->{'routing'}{$dispatch_key} or do {
+    my $todo_cr = $self->{'routing'}{$dispatch_key};
+
+    if (!$todo_cr) {
+        for my $route (keys %{ $self->{'routing'} }) {
+            if (index($dispatch_key, $route) == 0) {
+                $todo_cr = $self->{'routing'}{$route};
+                last;
+            }
+        }
+    }
+
+    $todo_cr or do {
         my @routes = sort keys %{ $self->{'routing'} };
         die "No routing for '$dispatch_key'! (@routes)";
     };

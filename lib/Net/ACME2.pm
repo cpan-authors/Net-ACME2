@@ -132,25 +132,10 @@ Specific error classes aren’t yet defined.
 
 =head1 CRYPTOGRAPHY & SPEED
 
-L<Crypt::Perl> provides all cryptographic operations that this library
-needs using pure Perl. While this satisfies this module’s intent to be
-as pure-Perl as possible, there are a couple of significant drawbacks
-to this approach: firstly, it’s slower than XS-based code, and secondly,
-it loses the security benefits of the vetting that more widely-used
-cryptography libraries receive.
-
-To address these problems, Net::ACME2 will, after parsing a key, look
-for and prefer the following XS-based libraries for cryptography instead:
-
-=over
-
-=item * L<CryptX> (based on L<LibTomCrypt|http://www.libtom.net/LibTomCrypt/>)
-
-=back
-
-If the above are unavailable to you, then you may be able to speed up
-your L<Math::BigInt> installation; see that module’s documentation
-for more details.
+L<CryptX> (based on L<LibTomCrypt|http://www.libtom.net/LibTomCrypt/>)
+provides the primary cryptographic backend for key operations (signing,
+JWK export, thumbprints). L<Crypt::Perl> is used as a fallback and for
+X.509 certificate generation (tls-alpn-01 challenge).
 
 =cut
 
@@ -407,20 +392,97 @@ sub create_account {
 
             $self->{'_http'}->set_key_id( $self->{'_key_id'} );
 
-            return 0 if $resp->status() == _HTTP_OK;
+            my $is_new;
 
-            $resp->die_because_unexpected() if $resp->status() != _HTTP_CREATED;
+            if ($resp->status() == _HTTP_OK) {
+                $is_new = 0;
+            }
+            elsif ($resp->status() == _HTTP_CREATED) {
+                $is_new = 1;
+            }
+            else {
+                $resp->die_because_unexpected();
+            }
 
             my $struct = $resp->content_struct();
 
             if ($struct) {
-                for my $name (newAccount_booleans()) {
-                    next if !exists $struct->{$name};
-                    ($struct->{$name} &&= 1) ||= 0;
+                $self->{'_orders_url'} = $struct->{'orders'} if $struct->{'orders'};
+
+                if ($is_new) {
+                    for my $name (newAccount_booleans()) {
+                        next if !exists $struct->{$name};
+                        ($struct->{$name} &&= 1) ||= 0;
+                    }
                 }
             }
 
-            return 1;
+            return $is_new;
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
+=head2 promise(@order_urls) = I<OBJ>->get_orders()
+
+Returns a list of order URLs associated with the account. This
+corresponds to the C<orders> field of the ACME account object
+(RFC 8555, section 7.1.2.1).
+
+Not all ACME servers provide the C<orders> URL (e.g., Let's Encrypt
+does not). If the URL is unavailable, this method throws an exception.
+
+=cut
+
+sub get_orders {
+    my ($self) = @_;
+
+    my $orders_url = $self->{'_orders_url'} or do {
+        _die_generic('No orders URL available. The ACME server may not support this feature (RFC 8555 section 7.1.2.1).');
+    };
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get($orders_url),
+        sub {
+            my $resp = shift;
+
+            return @{ $resp->content_struct()->{'orders'} || [] };
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
+=head2 promise(\%account) = I<OBJ>->update_account( %OPTS )
+
+Updates the account associated with the ACME2 object's key.
+%OPTS are as described in RFC 8555 section 7.3.2; in practice
+only C<contact> is meaningfully updatable. Example:
+
+    my $acct = $acme->update_account(
+        contact => ['mailto:new@example.com'],
+    );
+
+Returns a hashref of the updated account object.
+
+=cut
+
+sub update_account {
+    my ($self, %opts) = @_;
+
+    my $url = $self->{'_key_id'} or do {
+        _die_generic('No key ID has been set. Either pass "key_id" to new(), or create_account().');
+    };
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_url( $url, \%opts ),
+        sub {
+            my ($resp) = @_;
+
+            $resp->die_because_unexpected() if $resp->status() != _HTTP_OK;
+
+            return $resp->content_struct();
         },
     );
 }
@@ -581,12 +643,50 @@ Accepts a L<Net::ACME2::Authorization> instance and polls the
 ACME server for that authorization’s status. The $AUTHORIZATION
 object is then updated with the results of the poll.
 
+If the server includes a C<Retry-After> header, it is stored on the
+$AUTHORIZATION object and accessible via C<< $AUTHORIZATION->retry_after() >>.
+
 As a courtesy, this returns the $AUTHORIZATION’s new C<status()>.
 
 =cut
 
 #This has to handle updates to the authz and challenge objects
 *poll_authorization = *_poll_order_or_authz;
+
+#----------------------------------------------------------------------
+
+=head2 promise($status) = I<OBJ>->deactivate_authorization( $AUTHORIZATION )
+
+Deactivates an authorization, as described in RFC 8555 section 7.5.2.
+
+Accepts a L<Net::ACME2::Authorization> instance and asks the ACME server
+to deactivate it. The $AUTHORIZATION object is then updated with the
+results of the deactivation.
+
+As a courtesy, this returns the $AUTHORIZATION's new C<status()>,
+which should be C<deactivated>.
+
+=cut
+
+sub deactivate_authorization {
+    my ($self, $authz_obj) = @_;
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_url(
+            $authz_obj->id(),
+            {
+                status => 'deactivated',
+            },
+        ),
+        sub {
+            my $resp = shift;
+
+            $authz_obj->update( $resp->content_struct() );
+
+            return $authz_obj->status();
+        },
+    );
+}
 
 #----------------------------------------------------------------------
 
@@ -638,7 +738,8 @@ sub finalize_order {
 =head2 promise($status) = I<OBJ>->poll_order( $ORDER )
 
 Like C<poll_authorization()> but handles a
-L<Net::ACME2::Order> object instead.
+L<Net::ACME2::Order> object instead. The C<Retry-After> header,
+if present, is accessible via C<< $ORDER->retry_after() >>.
 
 =cut
 
@@ -662,6 +763,100 @@ sub get_certificate_chain {
         $self->_post_as_get( $order->certificate() ),
         sub {
             return shift()->content();
+        },
+    );
+}
+
+#----------------------------------------------------------------------
+
+=head2 promise(\%chains) = I<OBJ>->get_certificate_chains( $ORDER )
+
+Like C<get_certificate_chain()> but also fetches any alternate
+certificate chains that the server offers via C<Link> headers with
+C<rel="alternate"> (per RFC 8555, section 7.4.2).
+
+Returns a hash reference:
+
+    {
+        default    => $pem_chain,
+        alternates => [ $alt_pem1, $alt_pem2, ... ],
+    }
+
+If the server offers no alternate chains, C<alternates> will be
+an empty array reference.
+
+=cut
+
+sub get_certificate_chains {
+    my ($self, $order) = @_;
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get( $order->certificate() ),
+        sub {
+            my ($resp) = @_;
+
+            my $default = $resp->content();
+
+            my @alt_urls = _parse_link_alternates($resp);
+
+            if (!@alt_urls) {
+                return {
+                    default    => $default,
+                    alternates => [],
+                };
+            }
+
+            return $self->_fetch_alternates($default, \@alt_urls);
+        },
+    );
+}
+
+sub _parse_link_alternates {
+    my ($resp) = @_;
+
+    my $link_header = $resp->header('link');
+
+    return if !defined $link_header;
+
+    my @links = ref $link_header ? @$link_header : ($link_header);
+
+    my @alt_urls;
+    for my $link (@links) {
+        if ($link =~ m{<([^>]+)>\s*;\s*rel="alternate"}) {
+            push @alt_urls, $1;
+        }
+    }
+
+    return @alt_urls;
+}
+
+sub _fetch_alternates {
+    my ($self, $default, $alt_urls) = @_;
+
+    my $result = {
+        default    => $default,
+        alternates => [],
+    };
+
+    my $remaining = [ @$alt_urls ];
+
+    return $self->_fetch_next_alternate($result, $remaining);
+}
+
+sub _fetch_next_alternate {
+    my ($self, $result, $remaining) = @_;
+
+    if (!@$remaining) {
+        return $result;
+    }
+
+    my $url = shift @$remaining;
+
+    return Net::ACME2::PromiseUtil::then(
+        $self->_post_as_get($url),
+        sub {
+            push @{ $result->{'alternates'} }, shift()->content();
+            return $self->_fetch_next_alternate($result, $remaining);
         },
     );
 }
@@ -720,6 +915,8 @@ sub _poll_order_or_authz {
             my $content = $get->content_struct();
 
             $order_or_authz_obj->update($content);
+
+            $order_or_authz_obj->{'_retry_after'} = $get->header('retry-after');
 
             return $order_or_authz_obj->status();
         },
@@ -810,8 +1007,6 @@ sub _die_generic {
 =item * Add pre-authorization support if there is ever a production
 use for it.
 
-=item * Expose the Retry-After header via the module API.
-
 =item * There is currently no way to fetch an order or challenge’s
 properties via URL. Prior to ACME’s adoption of “POST-as-GET” this was
 doable via a plain GET to the URL, but that’s no longer possible.
@@ -827,7 +1022,8 @@ simple as possible.)
 
 L<Crypt::LE> is another ACME client library.
 
-L<Crypt::Perl> provides this library’s default cryptography backend.
+L<CryptX> provides this library’s primary cryptography backend.
+L<Crypt::Perl> is used as a fallback and for X.509 operations.
 See this distribution’s F</examples> directory for sample usage
 to generate keys and CSRs.
 

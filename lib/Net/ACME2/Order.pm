@@ -27,6 +27,7 @@ use constant _ACCESSORS => (
     'notAfter',
     'certificate',
     'finalize',
+    'retry_after',
 );
 
 =head1 ACCESSORS
@@ -48,6 +49,12 @@ These provide text strings as defined in the ACME specification:
 =item * B<certificate()>
 
 =item * B<finalize()>
+
+=item * B<retry_after()>
+
+The C<Retry-After> value from the most recent poll response,
+or C<undef> if the server did not send one. Only populated
+after C<poll_order()>.
 
 =back
 
