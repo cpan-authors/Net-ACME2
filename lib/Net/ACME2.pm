@@ -1190,10 +1190,6 @@ sub _die_generic {
 *create_new_account = *create_account;
 *create_new_order = *create_order;
 
-# sub DESTROY {
-#     print "ACME2 destroyed at ${^GLOBAL_PHASE}\n";
-# }
-
 1;
 
 =head1 TODO

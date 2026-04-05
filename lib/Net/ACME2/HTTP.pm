@@ -39,11 +39,7 @@ our $verify_SSL = 1;
 sub new {
     my ( $class, %opts ) = @_;
 
-    my $is_sync;
-
     $opts{'ua'} ||= do {
-        $is_sync = 1;
-
         require Net::ACME2::HTTP_Tiny;
         Net::ACME2::HTTP_Tiny->new( verify_SSL => $verify_SSL );
     };
@@ -53,7 +49,6 @@ sub new {
         _acme_key => $opts{'key'},
         _key_id => $opts{'key_id'},
         _retries_left => $_MAX_RETRIES,
-        _sync_io => $is_sync,
     }, $class;
 
     return bless $self, $class;
@@ -143,8 +138,6 @@ sub _post {
         $self->_create_jwt( $jwt_method, $url, $data ),
         sub {
             my $jws = shift;
-
-            # local $opts_hr->{'headers'}{'Content-Type'} = 'application/jose+json';
 
             return Net::ACME2::PromiseUtil::do_then_catch(
                 sub {
