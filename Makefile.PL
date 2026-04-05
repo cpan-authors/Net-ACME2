@@ -23,6 +23,7 @@ WriteMakefile(
         'Call::Context'            => 0.02,
         'Crypt::Format'            => 0.06,
         'Crypt::Perl'              => 0.18,
+        'CryptX'                   => 0,
         'HTTP::Tiny'               => 0.058,
         'HTTP::Tiny::UA::Response' => 0.004,
         'JSON'                     => 2.9,
@@ -64,7 +65,6 @@ WriteMakefile(
         prereqs => {
             runtime => {
                 recommends => {
-                    'CryptX'              => 0,
                     'Net::Curl::Multi'    => 0,
                 },
             },

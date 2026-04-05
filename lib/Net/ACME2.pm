@@ -132,25 +132,10 @@ Specific error classes aren’t yet defined.
 
 =head1 CRYPTOGRAPHY & SPEED
 
-L<Crypt::Perl> provides all cryptographic operations that this library
-needs using pure Perl. While this satisfies this module’s intent to be
-as pure-Perl as possible, there are a couple of significant drawbacks
-to this approach: firstly, it’s slower than XS-based code, and secondly,
-it loses the security benefits of the vetting that more widely-used
-cryptography libraries receive.
-
-To address these problems, Net::ACME2 will, after parsing a key, look
-for and prefer the following XS-based libraries for cryptography instead:
-
-=over
-
-=item * L<CryptX> (based on L<LibTomCrypt|http://www.libtom.net/LibTomCrypt/>)
-
-=back
-
-If the above are unavailable to you, then you may be able to speed up
-your L<Math::BigInt> installation; see that module’s documentation
-for more details.
+L<CryptX> (based on L<LibTomCrypt|http://www.libtom.net/LibTomCrypt/>)
+provides the primary cryptographic backend for key operations (signing,
+JWK export, thumbprints). L<Crypt::Perl> is used as a fallback and for
+X.509 certificate generation (tls-alpn-01 challenge).
 
 =cut
 
@@ -743,7 +728,8 @@ simple as possible.)
 
 L<Crypt::LE> is another ACME client library.
 
-L<Crypt::Perl> provides this library’s default cryptography backend.
+L<CryptX> provides this library’s primary cryptography backend.
+L<Crypt::Perl> is used as a fallback and for X.509 operations.
 See this distribution’s F</examples> directory for sample usage
 to generate keys and CSRs.
 
