@@ -77,7 +77,7 @@ WriteMakefile(
         provides => {
             'Net::ACME2' => {
                 file    => 'lib/Net/ACME2.pm',
-                version => '0.40_02',
+                version => MM->parse_version('lib/Net/ACME2.pm'),
             },
         },
 
