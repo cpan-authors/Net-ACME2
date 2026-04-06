@@ -652,8 +652,14 @@ my $acme_key = Net::ACME2::AccountKey->new($_KEY_PEM);
 
     ok($err, '_xform_http_error re-throws when DESTROY clobbers $@');
     ok(
-        eval { $err->isa('Net::ACME2::X::HTTP::Protocol') },
-        '_xform_http_error preserves exception type (not empty string)',
+        eval { $err->isa('Net::ACME2::X::Generic') },
+        '_xform_http_error wraps unparsable body in Generic exception',
+    ) or diag("Got: " . (defined $err ? $err : "(undef)"));
+
+    # The original HTTP::Protocol exception is accessible via get('http')
+    ok(
+        eval { $err->get('http')->isa('Net::ACME2::X::HTTP::Protocol') },
+        '_xform_http_error carries original HTTP::Protocol in "http" property',
     ) or diag("Got: " . (defined $err ? $err : "(undef)"));
 }
 
@@ -730,6 +736,117 @@ my $acme_key = Net::ACME2::AccountKey->new($_KEY_PEM);
         eval { $err->isa('Net::ACME2::X::ACME') },
         '_post catch preserves ACME exception type (not empty string)',
     ) or diag("Got: " . (defined $err ? $err : "(undef)"));
+}
+
+#----------------------------------------------------------------------
+# Test: non-JSON error body includes parse failure in exception
+#
+# When a server returns a non-JSON error body (e.g., an HTML proxy error),
+# JSON::decode_json() fails inside _xform_http_error(). The parse failure
+# and raw response content must be surfaced in the exception so the caller
+# can diagnose the server problem — not silently swallowed.
+#----------------------------------------------------------------------
+
+{
+    my $mock = MockUA->new(responses => []);
+
+    no warnings 'redefine';
+    local *MockUA::request = sub {
+        my ($self, $method, $url, $args) = @_;
+
+        die Net::ACME2::X->create(
+            'HTTP::Protocol',
+            {
+                method  => 'GET',
+                url     => $url,
+                status  => 502,
+                reason  => 'Bad Gateway',
+                headers => {},
+                content => '<html><body>Bad Gateway</body></html>',
+            },
+        );
+    };
+    use warnings 'redefine';
+
+    my $http = Net::ACME2::HTTP->new(
+        key => $acme_key,
+        ua  => $mock,
+    );
+
+    my $err;
+    eval {
+        $http->get('https://example.com/directory');
+        1;
+    } or $err = $@;
+
+    ok($err, 'non-JSON error body throws exception');
+
+    my $err_str = "$err";
+
+    like(
+        $err_str,
+        qr/Bad Gateway/,
+        'exception includes raw response content',
+    );
+
+    like(
+        $err_str,
+        qr/JSON|decode|parse/i,
+        'exception mentions JSON parse failure',
+    );
+}
+
+#----------------------------------------------------------------------
+# Test: truncated JSON error body includes parse failure in exception
+#----------------------------------------------------------------------
+
+{
+    my $mock = MockUA->new(responses => []);
+
+    no warnings 'redefine';
+    local *MockUA::request = sub {
+        my ($self, $method, $url, $args) = @_;
+
+        die Net::ACME2::X->create(
+            'HTTP::Protocol',
+            {
+                method  => 'GET',
+                url     => $url,
+                status  => 500,
+                reason  => 'Internal Server Error',
+                headers => {},
+                content => '{"type":"urn:ietf:params:acme:error:serverInternal","deta',
+            },
+        );
+    };
+    use warnings 'redefine';
+
+    my $http = Net::ACME2::HTTP->new(
+        key => $acme_key,
+        ua  => $mock,
+    );
+
+    my $err;
+    eval {
+        $http->get('https://example.com/directory');
+        1;
+    } or $err = $@;
+
+    ok($err, 'truncated JSON error body throws exception');
+
+    my $err_str = "$err";
+
+    like(
+        $err_str,
+        qr/serverInternal/,
+        'truncated JSON: exception includes partial response content',
+    );
+
+    # Verify the original HTTP exception is accessible
+    ok(
+        eval { $err->get('http')->isa('Net::ACME2::X::HTTP::Protocol') },
+        'exception carries original HTTP::Protocol error',
+    );
 }
 
 done_testing();
