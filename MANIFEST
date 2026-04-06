@@ -63,6 +63,7 @@ t/Net-ACME2-EAB.t
 t/Net-ACME2-Error.t
 t/Net-ACME2-get-certificate-guard.t
 t/Net-ACME2-get_orders.t
+t/Net-ACME2-HTTP-Convert.t
 t/Net-ACME2-HTTP.t
 t/Net-ACME2-JWTMaker.t
 t/Net-ACME2-key-change.t
