@@ -60,6 +60,7 @@ t/Net-ACME2-Challenge-tls_alpn_01.t
 t/Net-ACME2-Challenge.t
 t/Net-ACME2-EAB.t
 t/Net-ACME2-Error.t
+t/Net-ACME2-get-certificate-guard.t
 t/Net-ACME2-get_orders.t
 t/Net-ACME2-HTTP.t
 t/Net-ACME2-JWTMaker.t
