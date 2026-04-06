@@ -1043,7 +1043,7 @@ sub _key_thumbprint {
 sub _get_directory {
     my ($self) = @_;
 
-    return $self->{'_directory_promise'} ||= do {
+    return $self->{'_directory_cache'} ||= do {
         my $dir_path = $self->DIRECTORY_PATH();
 
         my $http = $self->{'_http'};
@@ -1189,10 +1189,6 @@ sub _die_generic {
 #legacy aliases
 *create_new_account = *create_account;
 *create_new_order = *create_order;
-
-# sub DESTROY {
-#     print "ACME2 destroyed at ${^GLOBAL_PHASE}\n";
-# }
 
 1;
 

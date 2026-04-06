@@ -136,6 +136,8 @@ sub _imitate_http_tiny {
 
     my %headers;
     for my $line ( split m<\x0d?\x0a>, $head ) {
+        next if !length $line;
+
         if (defined $reason) {
             my ($name, $value) = split m<\s*:\s*>, $line, 2;
             $name =~ tr<A-Z><a-z>;
