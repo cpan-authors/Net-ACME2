@@ -46,6 +46,7 @@ use Net::Curl::Easy ();
 
 use Net::ACME2 ();
 use Net::ACME2::HTTP::Convert ();
+use Net::ACME2::X ();
 
 use constant _HTTP_TINY_INTERNAL_EXCEPTION_REASON => 'Internal Exception';
 
@@ -159,8 +160,7 @@ sub _imitate_http_tiny {
                 $reason = $1;
             }
             else {
-                $reason = q<>;
-                warn "Unparsable first header line: [$line]\n";
+                die Net::ACME2::X->create('Generic', "Unparsable first header line: [$line]");
             }
         }
     }
