@@ -1,5 +1,6 @@
 AI_POLICY.md
 Changes
+CONTRIBUTING.md
 examples/dns-01.pl
 examples/dns-01_async.pl
 examples/http-01.pl
@@ -50,6 +51,7 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 README.md
+SECURITY.md
 t/lib/Test/ACME2_Server.pm
 t/lib/Test/Crypt.pm
 t/Net-ACME2-Authorization.t
