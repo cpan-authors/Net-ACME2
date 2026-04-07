@@ -52,6 +52,7 @@ MANIFEST.SKIP
 README.md
 t/lib/Test/ACME2_Server.pm
 t/lib/Test/Crypt.pm
+t/Net-ACME2-AccountKey.t
 t/Net-ACME2-Authorization.t
 t/Net-ACME2-Challenge-dns_01.t
 t/Net-ACME2-Challenge-dns_account_01.t
