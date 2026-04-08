@@ -71,4 +71,3 @@ t/Net-ACME2-PromiseUtil.t
 t/Net-ACME2-RetryAfter.t
 t/Net-ACME2-revoke.t
 t/Net-ACME2.t
-t/Net-ACME2_pre_rename.t
