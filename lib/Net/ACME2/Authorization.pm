@@ -144,7 +144,7 @@ sub challenges {
 sub update {
     my ($self, $new_hr) = @_;
 
-    for my $name ( 'status', 'challenges' ) {
+    for my $name ( 'status', 'challenges', 'expires' ) {
         $self->{"_$name"} = $new_hr->{$name};
     }
 
