@@ -105,7 +105,7 @@ a new version of this module.
 
 =over
 
-=item * Support for both ECDSA and RSA encrytion.
+=item * Support for both ECDSA and RSA encryption.
 
 =item * Support for http-01, dns-01, and L<tls-alpn-01|https://datatracker.ietf.org/doc/draft-ietf-acme-tls-alpn/> challenges.
 

@@ -51,7 +51,7 @@ sub new {
         _retries_left => $_MAX_RETRIES,
     }, $class;
 
-    return bless $self, $class;
+    return $self;
 }
 
 sub timeout {
