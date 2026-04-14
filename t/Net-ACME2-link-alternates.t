@@ -7,8 +7,9 @@ use Test::More;
 use Test::FailWarnings;
 
 # _parse_link_alternates is a private function in Net::ACME2.
-# We test it directly to verify RFC 8288 compliance (case-insensitive
-# relation types).
+# We test it directly to verify RFC 8288 compliance:
+# - relation types are case-insensitive (section 2.1.1)
+# - link parameters may appear in any order (section 3)
 
 use Net::ACME2 ();
 
@@ -33,7 +34,7 @@ use Net::ACME2 ();
     is( scalar @urls, 0, 'no Link header returns empty list' );
 }
 
-# --- Single alternate link (lowercase) ---
+# --- Single alternate link ---
 {
     my $resp = MockResponse->new(
         link => '<https://ca.example/cert/alt1>;rel="alternate"',
@@ -42,7 +43,7 @@ use Net::ACME2 ();
     is_deeply(
         \@urls,
         ['https://ca.example/cert/alt1'],
-        'single lowercase alternate link',
+        'single alternate link',
     );
 }
 
@@ -87,7 +88,7 @@ use Net::ACME2 ();
     );
 }
 
-# --- RFC 8288: relation types are case-insensitive ---
+# --- RFC 8288 section 2.1.1: relation types are case-insensitive ---
 {
     my $resp = MockResponse->new(
         link => '<https://ca.example/cert/alt1>;rel="Alternate"',
@@ -112,7 +113,7 @@ use Net::ACME2 ();
     );
 }
 
-# --- Whitespace variations in Link header ---
+# --- Whitespace variations ---
 {
     my $resp = MockResponse->new(
         link => '<https://ca.example/cert/alt1> ; rel="alternate"',
@@ -122,6 +123,61 @@ use Net::ACME2 ();
         \@urls,
         ['https://ca.example/cert/alt1'],
         'extra whitespace around semicolon',
+    );
+}
+
+# --- RFC 8288 section 3: parameters may appear in any order ---
+# The rel parameter does not need to be the first parameter after the URI.
+{
+    my $resp = MockResponse->new(
+        link => '<https://ca.example/cert/alt1>; title="cross-signed"; rel="alternate"',
+    );
+    my @urls = Net::ACME2::_parse_link_alternates($resp);
+    is_deeply(
+        \@urls,
+        ['https://ca.example/cert/alt1'],
+        'rel after other params (title before rel)',
+    );
+}
+
+{
+    my $resp = MockResponse->new(
+        link => '<https://ca.example/cert/alt1>; type="application/pem-certificate-chain"; rel="alternate"',
+    );
+    my @urls = Net::ACME2::_parse_link_alternates($resp);
+    is_deeply(
+        \@urls,
+        ['https://ca.example/cert/alt1'],
+        'rel after type param',
+    );
+}
+
+{
+    my $resp = MockResponse->new(
+        link => '<https://ca.example/cert/alt1>; rel="alternate"; title="ISRG Root X2"',
+    );
+    my @urls = Net::ACME2::_parse_link_alternates($resp);
+    is_deeply(
+        \@urls,
+        ['https://ca.example/cert/alt1'],
+        'rel before other params (rel then title)',
+    );
+}
+
+# --- rel in any position with mixed links ---
+{
+    my $resp = MockResponse->new(
+        link => [
+            '<https://ca.example/directory>; rel="index"',
+            '<https://ca.example/cert/alt1>; title="cross-signed"; rel="alternate"',
+            '<https://ca.example/cert/alt2>; rel="alternate"; title="ISRG Root X2"',
+        ],
+    );
+    my @urls = Net::ACME2::_parse_link_alternates($resp);
+    is_deeply(
+        \@urls,
+        ['https://ca.example/cert/alt1', 'https://ca.example/cert/alt2'],
+        'mixed links with rel in various positions',
     );
 }
 

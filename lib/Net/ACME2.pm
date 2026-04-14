@@ -923,9 +923,8 @@ sub _parse_link_alternates {
 
     my @alt_urls;
     for my $link (@links) {
-        if ($link =~ m{<([^>]+)>\s*;\s*rel="alternate"}i) {
-            push @alt_urls, $1;
-        }
+        next unless $link =~ m{;\s*rel="alternate"}i;
+        push @alt_urls, $1 if $link =~ m{<([^>]+)>};
     }
 
     return @alt_urls;
