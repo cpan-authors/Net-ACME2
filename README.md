@@ -91,7 +91,7 @@ a new version of this module.
 
 # FEATURES
 
-- Support for both ECDSA and RSA encrytion.
+- Support for both ECDSA and RSA encryption.
 - Support for http-01, dns-01, and [tls-alpn-01](https://datatracker.ietf.org/doc/draft-ietf-acme-tls-alpn/) challenges.
 - Comprehensive error handling with typed, [X::Tiny](https://metacpan.org/pod/X%3A%3ATiny)-based exceptions.
 - Supports blocking and (experimentally) non-blocking I/O.
