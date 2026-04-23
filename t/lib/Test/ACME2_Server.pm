@@ -324,13 +324,26 @@ sub new {
 
         'POST:/order/1' => sub {
             my $h = $self->{'ca_class'}->HOST();
-            my $status = $self->{'_order_finalized'} ? 'valid' : 'pending';
+            my $status = $self->{'_order_invalid'}  ? 'invalid'
+                       : $self->{'_order_finalized'} ? 'valid'
+                       : 'pending';
 
             my $order = $self->{'_orders'}{1};
             $order->{'status'} = $status;
 
             if ($status eq 'valid') {
                 $order->{'certificate'} = "https://$h/cert/1";
+            }
+
+            if ($self->{'_order_error'}) {
+                $order->{'error'} = $self->{'_order_error'};
+            }
+            else {
+                delete $order->{'error'};
+            }
+
+            if ($self->{'_order_expires'}) {
+                $order->{'expires'} = $self->{'_order_expires'};
             }
 
             my %extra_headers;
@@ -477,9 +490,15 @@ sub _authz_content {
                : $self->{'_challenge_accepted'} ? 'valid'
                : 'pending';
 
+    my %extra;
+    if ($self->{'_authz_expires'}) {
+        $extra{'expires'} = $self->{'_authz_expires'};
+    }
+
     return {
         status => $status,
         identifier => { type => 'dns', value => 'example.com' },
+        %extra,
         challenges => [
             {
                 type => 'http-01',

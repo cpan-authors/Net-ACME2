@@ -29,6 +29,7 @@ use constant _ACCESSORS => (
     'certificate',
     'finalize',
     'retry_after',
+    'error',
 );
 
 =head1 ACCESSORS
@@ -56,6 +57,12 @@ These provide text strings as defined in the ACME specification:
 The C<Retry-After> value from the most recent poll response,
 or C<undef> if the server did not send one. Only populated
 after C<poll_order()>.
+
+=item * B<error()>
+
+The error object (as a hash reference) from the ACME server when the
+order's status is C<invalid>. This is an RFC 7807 problem document.
+C<undef> when the order has no error. Updated by C<poll_order()>.
 
 =back
 
@@ -110,7 +117,7 @@ sub identifiers {
 sub update {
     my ($self, $new_hr) = @_;
 
-    for my $name ( 'status', 'certificate' ) {
+    for my $name ( 'status', 'certificate', 'expires', 'error' ) {
         $self->{"_$name"} = $new_hr->{$name};
     }
 
