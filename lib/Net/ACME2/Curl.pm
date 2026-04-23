@@ -237,7 +237,7 @@ sub _assign_headers {
                 push @hdr_strs, "$name: $_" for @$value;
             }
             elsif (ref $value) {
-                die "Can’t handle $value as header!" if ref $value;
+                die Net::ACME2::X->create('Generic', "Can't handle " . ref($value) . " reference as header value for '$name'!");
             }
             else {
                 push @hdr_strs, "$name: $value";
