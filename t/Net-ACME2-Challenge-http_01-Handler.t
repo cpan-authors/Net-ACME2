@@ -106,6 +106,22 @@ ok(
     );
 }
 
+# --- get_content() tests ---
+
+# get_content() without ACME instance should die
+throws_ok(
+    sub { $challenge->get_content() },
+    qr/Net::ACME2/,
+    'get_content() dies without ACME instance',
+);
+
+# get_content() with a mock ACME-like object should return key authorization
+{
+    my $mock_acme = bless [], 'Mock::Authz';
+    my $content = $challenge->get_content($mock_acme);
+    is( $content, 'my_object_key_authz', 'get_content() returns key authorization from ACME object' );
+}
+
 done_testing();
 
 #----------------------------------------------------------------------
