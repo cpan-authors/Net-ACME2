@@ -79,7 +79,5 @@ gracefully with `eval { require ... }` and SKIP blocks.
 
 - The `Edit` tool can introduce Unicode smart quotes into `.pm`/`.pl` files.
   Always verify edited Perl files compile: `perl -c <file>`.
-- Handler.pm's `$ASSUME_UNIX_PATHS` switches between File::Spec and simple
-  string ops — both paths need testing.
 - The Curl async backend is only activated when `async_ua` is passed to
   `Net::ACME2->new()`; the default path uses HTTP_Tiny.
