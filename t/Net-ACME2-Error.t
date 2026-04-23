@@ -114,4 +114,81 @@ use Net::ACME2::Error ();
     );
 }
 
+# Test type() defaults to 'about:blank' when unset
+{
+    my $err = Net::ACME2::Error->new();
+
+    is(
+        $err->type(),
+        'about:blank',
+        'type() defaults to about:blank',
+    );
+}
+
+# Test description() with known ACME URN types
+{
+    my @known_types = (
+        [ 'badNonce'          => qr/unacceptable anti-replay nonce/ ],
+        [ 'rateLimited'       => qr/rate limit/ ],
+        [ 'unauthorized'      => qr/lacks sufficient authorization/ ],
+        [ 'serverInternal'    => qr/internal error/ ],
+        [ 'malformed'         => qr/malformed/ ],
+        [ 'badCSR'            => qr/unacceptable/ ],
+        [ 'rejectedIdentifier'=> qr/will not issue/ ],
+        [ 'caa'               => qr/CAA/ ],
+        [ 'dns'               => qr/DNS query/ ],
+    );
+
+    for my $t (@known_types) {
+        my ($short_type, $desc_re) = @$t;
+
+        my $err = Net::ACME2::Error->new(
+            type => "urn:ietf:params:acme:error:$short_type",
+        );
+
+        like(
+            $err->description(),
+            $desc_re,
+            "description() for $short_type",
+        );
+    }
+}
+
+# Test description() returns undef for unknown types
+{
+    my $err = Net::ACME2::Error->new(
+        type => 'urn:ietf:params:acme:error:totallyMadeUp',
+    );
+
+    is( $err->description(), undef, 'description() undef for unknown type' );
+}
+
+# Test to_string() includes description for known URN types
+{
+    my $err = Net::ACME2::Error->new(
+        status => 429,
+        type   => 'urn:ietf:params:acme:error:rateLimited',
+        detail => 'too many requests',
+    );
+
+    my $str = $err->to_string();
+
+    like( $str, qr/429/,         'to_string has status' );
+    like( $str, qr/rateLimited/, 'to_string has type' );
+    like( $str, qr/rate limit/,  'to_string has description' );
+    like( $str, qr/too many/,    'to_string has detail' );
+}
+
+# Test subproblems() in list context enforcement
+{
+    my $err = Net::ACME2::Error->new(
+        status => 400,
+        type   => 'urn:ietf:params:acme:error:rejectedIdentifier',
+    );
+
+    # subproblems() requires list context
+    my @subs = $err->subproblems();
+    is( scalar @subs, 0, 'subproblems() returns empty list when none' );
+}
+
 done_testing();

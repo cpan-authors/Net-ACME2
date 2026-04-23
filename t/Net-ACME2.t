@@ -171,4 +171,27 @@ for my $t (@alg_key) {
     );
 }
 
+# Legacy aliases (create_new_account, create_new_order)
+{
+    my $SERVER_OBJ = Test::ACME2_Server->new(
+        ca_class => 'MyCA',
+    );
+
+    my $acme = MyCA->new( key => $_P256_KEY );
+
+    my $created = $acme->create_new_account(
+        termsOfServiceAgreed => 1,
+    );
+
+    is( $created, 1, 'create_new_account() alias works' );
+
+    my $order = $acme->create_new_order(
+        identifiers => [
+            { type => 'dns', value => 'example.com' },
+        ],
+    );
+
+    isa_ok( $order, 'Net::ACME2::Order', 'create_new_order() alias works' );
+}
+
 done_testing();
