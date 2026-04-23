@@ -1230,4 +1230,9 @@ to generate keys and CSRs.
 L<Net::ACME> implements client logic for the variant of this
 protocol that Let’s Encrypt first deployed.
 
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. See L<perlartistic>.
+
 =cut
