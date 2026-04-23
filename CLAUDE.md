@@ -74,6 +74,9 @@ gracefully with `eval { require ... }` and SKIP blocks.
   direct values in sync mode. Use `Net::ACME2::PromiseUtil::then()` internally.
 - **Exceptions**: Use `Net::ACME2::X::Generic` (via X::Tiny). Some internal dies
   use plain strings — this is the existing pattern, not a bug to fix.
+- **Shebangs**: Use `#!/usr/bin/perl`, not `#!/usr/bin/env perl`.
+  MakeMaker's `fixin` automatically adjusts the path at install time,
+  but only recognizes the canonical `/usr/bin/perl` form.
 
 ## Gotchas
 

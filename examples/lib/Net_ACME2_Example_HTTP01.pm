@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 package Net_ACME2_Example_HTTP01;
 
