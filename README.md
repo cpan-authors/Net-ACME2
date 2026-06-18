@@ -375,3 +375,8 @@ to generate keys and CSRs.
 
 [Net::ACME](https://metacpan.org/pod/Net%3A%3AACME) implements client logic for the variant of this
 protocol that Let’s Encrypt first deployed.
+
+# LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. See [perlartistic](https://metacpan.org/pod/perlartistic).

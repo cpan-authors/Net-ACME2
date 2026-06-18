@@ -54,6 +54,7 @@ README.md
 SECURITY.md
 t/lib/Test/ACME2_Server.pm
 t/lib/Test/Crypt.pm
+t/Net-ACME2-AccessorBase.t
 t/Net-ACME2-AccountKey.t
 t/Net-ACME2-Authorization.t
 t/Net-ACME2-Challenge-dns_01.t
@@ -70,6 +71,7 @@ t/Net-ACME2-HTTP-Convert.t
 t/Net-ACME2-HTTP.t
 t/Net-ACME2-JWTMaker.t
 t/Net-ACME2-key-change.t
+t/Net-ACME2-LetsEncrypt.t
 t/Net-ACME2-link-alternates.t
 t/Net-ACME2-order-lifecycle.t
 t/Net-ACME2-PromiseUtil.t
