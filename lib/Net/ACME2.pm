@@ -1051,24 +1051,36 @@ sub _get_directory {
     my ($self) = @_;
 
     return $self->{'_directory_cache'} ||= do {
-        my $dir_path = $self->DIRECTORY_PATH();
 
-        my $http = $self->{'_http'};
+        if (my $dir_hr = delete $self->{'_directory'}) {
+            my $new_nonce_url = $dir_hr->{'newNonce'} or do {
+                _die_generic('Directory lacks “newNonce”.');
+            };
 
-        Net::ACME2::PromiseUtil::then(
-            $self->{'_http'}->get("https://$self->{'_host'}$dir_path"),
-            sub {
-                my $dir_hr = shift()->content_struct();
+            $self->{'_http'}->set_new_nonce_url( $new_nonce_url );
 
-                my $new_nonce_url = $dir_hr->{'newNonce'} or do {
-                    _die_generic('Directory lacks “newNonce”.');
-                };
+            $dir_hr;
+        }
+        else {
+            my $dir_path = $self->DIRECTORY_PATH();
 
-                $http->set_new_nonce_url( $new_nonce_url );
+            my $http = $self->{'_http'};
 
-                return $dir_hr;
-            },
-        );
+            Net::ACME2::PromiseUtil::then(
+                $self->{'_http'}->get("https://$self->{'_host'}$dir_path"),
+                sub {
+                    my $dir_hr = shift()->content_struct();
+
+                    my $new_nonce_url = $dir_hr->{'newNonce'} or do {
+                        _die_generic('Directory lacks “newNonce”.');
+                    };
+
+                    $http->set_new_nonce_url( $new_nonce_url );
+
+                    return $dir_hr;
+                },
+            );
+        }
     };
 }
 
