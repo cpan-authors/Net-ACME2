@@ -53,7 +53,6 @@ my $server = Test::ACME2_Server->new( ca_class => 'MyCA' );
 
 my $acme = MyCA->new(
     key => $_RSA_KEY,
-    directory => MyCA->DIRECTORY_PATH(),
 );
 
 $acme->create_account(
