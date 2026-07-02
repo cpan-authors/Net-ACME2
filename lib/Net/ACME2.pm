@@ -1144,8 +1144,6 @@ sub _set_http {
     return;
 }
 
-our $_POST_METHOD;
-
 sub _post {
     my ( $self, $link_name, $data ) = @_;
 
