@@ -550,7 +550,7 @@ sub change_key {
 
     _die_generic('Need "new key"!') if !$new_key_pem_or_der;
 
-    $self->_require_key_id({});
+    $self->_require_key_id();
 
     my $new_key_obj = Net::ACME2::AccountKey->new($new_key_pem_or_der);
 
@@ -611,7 +611,7 @@ the C<key_id> parameter to C<new()>).
 sub deactivate_account {
     my ($self) = @_;
 
-    $self->_require_key_id({});
+    $self->_require_key_id();
 
     return Net::ACME2::PromiseUtil::then(
         $self->_post_url(
@@ -638,7 +638,7 @@ NB: C<create_new_order()> is an alias for this method.
 sub create_order {
     my ($self, %opts) = @_;
 
-    $self->_require_key_id(\%opts);
+    $self->_require_key_id();
 
     return Net::ACME2::PromiseUtil::then(
         $self->_post( 'newOrder', \%opts ),
@@ -1073,13 +1073,13 @@ sub _get_directory {
 }
 
 sub _require_key_id {
-    my ($self, $opts_hr) = @_;
+    my ($self) = @_;
 
-    $opts_hr->{'_key_id'} = $self->{'_key_id'} or do {
+    $self->{'_key_id'} or do {
         _die_generic('No key ID has been set. Either pass “key_id” to new(), or create_account().');
     };
 
-    return
+    return;
 }
 
 sub _poll_order_or_authz {
