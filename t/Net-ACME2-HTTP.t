@@ -849,4 +849,171 @@ my $acme_key = Net::ACME2::AccountKey->new($_KEY_PEM);
     );
 }
 
+#----------------------------------------------------------------------
+# Test: badNonce retry exhaustion — retries consumed, error re-thrown
+#
+# When all badNonce retries are used up, the code must warn and re-throw
+# the ACME error — not loop, not silently swallow it.
+#----------------------------------------------------------------------
+
+{
+    my $mock = MockUA->new(responses => [
+        # HEAD for nonce
+        {
+            status  => 'HTTP_NO_CONTENT',
+            headers => { 'replay-nonce' => 'nonce-exhaust' },
+            content => '',
+        },
+    ]);
+
+    no warnings 'redefine';
+    my $orig_request = \&MockUA::request;
+    local *MockUA::request = sub {
+        my ($self, $method, $url, $args) = @_;
+
+        if ($method eq 'POST') {
+            push @{ $self->{requests} }, {
+                method => $method,
+                url    => $url,
+                args   => $args,
+            };
+
+            die Net::ACME2::X->create(
+                'HTTP::Protocol',
+                {
+                    method  => 'POST',
+                    url     => $url,
+                    status  => 403,
+                    reason  => 'Forbidden',
+                    headers => { 'replay-nonce' => 'exhaust-nonce' },
+                    content => JSON::encode_json({
+                        type   => 'urn:ietf:params:acme:error:badNonce',
+                        detail => 'JWS has invalid anti-replay nonce',
+                        status => 403,
+                    }),
+                },
+            );
+        }
+
+        return $orig_request->($self, $method, $url, $args);
+    };
+    use warnings 'redefine';
+
+    my $http = Net::ACME2::HTTP->new(
+        key    => $acme_key,
+        key_id => 'https://example.com/acct/1',
+        ua     => $mock,
+    );
+
+    $http->set_new_nonce_url('https://example.com/new-nonce');
+
+    # Force retries to zero so the next badNonce hits the exhaustion path.
+    $http->{'_retries_left'} = 0;
+
+    my ($err, @warnings);
+    {
+        local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+        eval {
+            $http->post_key_id('https://example.com/resource', '');
+            1;
+        } or $err = $@;
+    }
+
+    ok($err, 'badNonce exhaustion: error re-thrown');
+    ok(
+        eval { $err->isa('Net::ACME2::X::ACME') },
+        'badNonce exhaustion: exception type preserved',
+    ) or diag("Got: " . (ref($err) || $err));
+
+    is(scalar @warnings, 1, 'badNonce exhaustion: exactly one warning');
+    like($warnings[0], qr/no retries left/i,
+         'badNonce exhaustion: warning mentions no retries');
+}
+
+#----------------------------------------------------------------------
+# Test: badNonce without Replay-Nonce header (RFC 8555/6.5 violation)
+#
+# If an ACME server sends a badNonce error but omits the Replay-Nonce
+# header from the error response, the client cannot retry (it has no
+# fresh nonce to use). This is a server-side protocol violation.
+#----------------------------------------------------------------------
+
+{
+    my $mock = MockUA->new(responses => [
+        # HEAD for initial nonce
+        {
+            status  => 'HTTP_NO_CONTENT',
+            headers => { 'replay-nonce' => 'nonce-rfc-viol' },
+            content => '',
+        },
+    ]);
+
+    no warnings 'redefine';
+    my $orig_request = \&MockUA::request;
+    local *MockUA::request = sub {
+        my ($self, $method, $url, $args) = @_;
+
+        if ($method eq 'POST') {
+            push @{ $self->{requests} }, {
+                method => $method,
+                url    => $url,
+                args   => $args,
+            };
+
+            # badNonce error WITHOUT replay-nonce — server violates RFC 8555/6.5
+            die Net::ACME2::X->create(
+                'HTTP::Protocol',
+                {
+                    method  => 'POST',
+                    url     => $url,
+                    status  => 403,
+                    reason  => 'Forbidden',
+                    headers => {},
+                    content => JSON::encode_json({
+                        type   => 'urn:ietf:params:acme:error:badNonce',
+                        detail => 'JWS has invalid anti-replay nonce',
+                        status => 403,
+                    }),
+                },
+            );
+        }
+
+        return $orig_request->($self, $method, $url, $args);
+    };
+    use warnings 'redefine';
+
+    my $http = Net::ACME2::HTTP->new(
+        key    => $acme_key,
+        key_id => 'https://example.com/acct/1',
+        ua     => $mock,
+    );
+
+    $http->set_new_nonce_url('https://example.com/new-nonce');
+
+    my ($err, @warnings);
+    {
+        local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+        eval {
+            $http->post_key_id('https://example.com/resource', '');
+            1;
+        } or $err = $@;
+    }
+
+    ok($err, 'RFC violation: error re-thrown');
+    ok(
+        eval { $err->isa('Net::ACME2::X::ACME') },
+        'RFC violation: exception type preserved',
+    ) or diag("Got: " . (ref($err) || $err));
+
+    is(scalar @warnings, 1, 'RFC violation: exactly one warning');
+    like($warnings[0], qr/RFC 8555/,
+         'RFC violation: warning cites RFC 8555');
+    like($warnings[0], qr/Replay-Nonce/,
+         'RFC violation: warning mentions missing header');
+
+    # No retry should have been attempted
+    my @posts = grep { $_->{method} eq 'POST' } @{ $mock->{requests} };
+    is(scalar @posts, 1, 'RFC violation: no retry (only 1 POST)');
+}
+
 done_testing();
